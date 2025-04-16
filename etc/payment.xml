@@ -32,5 +32,14 @@
         <method name="vindi_vp_pix">
             <allow_multiple_address>1</allow_multiple_address>
         </method>
+        <method name="vindi_vp_cardpix">
+            <allow_multiple_address>1</allow_multiple_address>
+        </method>
+        <method name="vindi_vp_cardcard">
+            <allow_multiple_address>1</allow_multiple_address>
+        </method>
+        <method name="vindi_vp_cardbankslippix">
+            <allow_multiple_address>1</allow_multiple_address>
+        </method>
     </methods>
 </payment>

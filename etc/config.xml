@@ -76,7 +76,6 @@
                 <cancelled_order_status>canceled</cancelled_order_status>
                 <allowspecific>0</allowspecific>
                 <specificcountry>BR</specificcountry>
-                <!-- Method config -->
                 <is_gateway>1</is_gateway>
                 <can_use_checkout>1</can_use_checkout>
                 <can_use_internal>1</can_use_internal>
@@ -101,7 +100,6 @@
                 <cancelled_order_status>canceled</cancelled_order_status>
                 <allowspecific>0</allowspecific>
                 <specificcountry>BR</specificcountry>
-                <!-- Method config -->
                 <is_gateway>1</is_gateway>
                 <can_use_checkout>1</can_use_checkout>
                 <can_use_internal>1</can_use_internal>
@@ -128,7 +126,6 @@
                 <allowspecific>0</allowspecific>
                 <specificcountry>BR</specificcountry>
                 <min_order_total>1</min_order_total>
-                <!-- Method config -->
                 <is_gateway>1</is_gateway>
                 <can_use_checkout>1</can_use_checkout>
                 <can_use_internal>1</can_use_internal>
@@ -157,7 +154,6 @@
                 <specificcountry>BR</specificcountry>
                 <cctypes>MC,VI,ELO,AE,HC,HI</cctypes>
                 <min_installments_amount>1</min_installments_amount>
-                <!-- Method config -->
                 <is_gateway>1</is_gateway>
                 <can_use_checkout>1</can_use_checkout>
                 <can_authorize>1</can_authorize>
@@ -178,7 +174,78 @@
                 <debugReplaceKeys>cvv,cc_number</debugReplaceKeys>
                 <payment_link_instructions>Enviamos um email com os detalhes do pedido.</payment_link_instructions>
             </vindi_vp_cc>
+            <vindi_vp_cardpix>
+                <active>0</active>
+                <model>VindiPaymentCardPixFacade</model>
+                <title>Cartão + Pix</title>
+                <payment_action>order</payment_action>
+                <order_status>pending</order_status>
+                <paid_order_status>processing</paid_order_status>
+                <paid_virtual_order_status>complete</paid_virtual_order_status>
+                <cancelled_order_status>canceled</cancelled_order_status>
+                <allowspecific>0</allowspecific>
+                <specificcountry>BR</specificcountry>
+                <is_gateway>1</is_gateway>
+                <can_use_checkout>1</can_use_checkout>
+                <can_use_internal>1</can_use_internal>
+                <can_order>1</can_order>
+                <can_capture_partial>0</can_capture_partial>
+                <can_refund_partial_per_invoice>0</can_refund_partial_per_invoice>
+                <can_cancel>1</can_cancel>
+                <can_edit>0</can_edit>
+                <paymentInfoKeys>transaction_id,token_transaction,track_transaction_id,status_name,tid,payment_method_id,payment_method_name,split</paymentInfoKeys>
+                <privateInfoKeys>transaction_id,token_transaction,track_transaction_id,tid,payment_method_id,payment_method_name,split</privateInfoKeys>
+                <debug>1</debug>
+                <payment_link_instructions>To pay, complete the card payment first, then scan the PIX QR code.</payment_link_instructions>
+            </vindi_vp_cardpix>
+            <vindi_vp_cardcard>
+                <active>0</active>
+                <model>VindiPaymentCardCardFacade</model>
+                <title>Cartão + Cartão</title>
+                <payment_action>order</payment_action>
+                <order_status>pending</order_status>
+                <paid_order_status>processing</paid_order_status>
+                <paid_virtual_order_status>complete</paid_virtual_order_status>
+                <cancelled_order_status>canceled</cancelled_order_status>
+                <allowspecific>0</allowspecific>
+                <specificcountry>BR</specificcountry>
+                <is_gateway>1</is_gateway>
+                <can_use_checkout>1</can_use_checkout>
+                <can_use_internal>1</can_use_internal>
+                <can_order>1</can_order>
+                <can_capture_partial>0</can_capture_partial>
+                <can_refund_partial_per_invoice>0</can_refund_partial_per_invoice>
+                <can_cancel>1</can_cancel>
+                <can_edit>0</can_edit>
+                <paymentInfoKeys>transaction_id,token_transaction,track_transaction_id,status_name,tid,payment_method_id,payment_method_name,split</paymentInfoKeys>
+                <privateInfoKeys>transaction_id,token_transaction,track_transaction_id,tid,payment_method_id,payment_method_name,split</privateInfoKeys>
+                <debug>1</debug>
+                <payment_link_instructions>Please complete the first card payment and then complete the second card payment.</payment_link_instructions>
+            </vindi_vp_cardcard>
+            <vindi_vp_cardbankslippix>
+                <active>0</active>
+                <model>VindiPaymentCardBankSlipPixFacade</model>
+                <title>Cartão + Bolepix</title>
+                <payment_action>order</payment_action>
+                <order_status>pending</order_status>
+                <paid_order_status>processing</paid_order_status>
+                <paid_virtual_order_status>complete</paid_virtual_order_status>
+                <cancelled_order_status>canceled</cancelled_order_status>
+                <allowspecific>0</allowspecific>
+                <specificcountry>BR</specificcountry>
+                <is_gateway>1</is_gateway>
+                <can_use_checkout>1</can_use_checkout>
+                <can_use_internal>1</can_use_internal>
+                <can_order>1</can_order>
+                <can_capture_partial>0</can_capture_partial>
+                <can_refund_partial_per_invoice>0</can_refund_partial_per_invoice>
+                <can_cancel>1</can_cancel>
+                <can_edit>0</can_edit>
+                <paymentInfoKeys>transaction_id,token_transaction,track_transaction_id,status_name,tid,payment_method_id,payment_method_name,split,bank_slip_number</paymentInfoKeys>
+                <privateInfoKeys>transaction_id,token_transaction,track_transaction_id,tid,payment_method_id,payment_method_name,split,bank_slip_number</privateInfoKeys>
+                <debug>1</debug>
+                <payment_link_instructions>To pay, complete the card payment first, then follow bank slip instructions.</payment_link_instructions>
+            </vindi_vp_cardbankslippix>
         </payment>
     </default>
 </config>
-

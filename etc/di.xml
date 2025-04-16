@@ -132,6 +132,58 @@
         </arguments>
     </virtualType>
 
+    <!-- Payment Method Facade configuration for Card + Pix -->
+    <virtualType name="VindiPaymentCardPixFacade" type="Magento\Payment\Model\Method\Adapter">
+        <arguments>
+            <argument name="code" xsi:type="const">\Vindi\VP\Model\Ui\CardPix\ConfigProvider::CODE</argument>
+            <argument name="formBlockType" xsi:type="string">Magento\Payment\Block\Form</argument>
+            <argument name="infoBlockType" xsi:type="string">Vindi\VP\Block\Info\CardPix</argument>
+            <argument name="valueHandlerPool" xsi:type="object">VindiCardPixValueHandlerPool</argument>
+            <argument name="validatorPool" xsi:type="object">VindiCardPixValidatorPool</argument>
+            <argument name="commandPool" xsi:type="object">VindiCardPixCommandPool</argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="VindiCardPixConfig" type="Magento\Payment\Gateway\Config\Config">
+        <arguments>
+            <argument name="methodCode" xsi:type="const">\Vindi\VP\Model\Ui\CardPix\ConfigProvider::CODE</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Payment Method Facade configuration for Card + Card -->
+    <virtualType name="VindiPaymentCardCardFacade" type="Magento\Payment\Model\Method\Adapter">
+        <arguments>
+            <argument name="code" xsi:type="const">\Vindi\VP\Model\Ui\CardCard\ConfigProvider::CODE</argument>
+            <argument name="formBlockType" xsi:type="string">Magento\Payment\Block\Form</argument>
+            <argument name="infoBlockType" xsi:type="string">Vindi\VP\Block\Info\CardCard</argument>
+            <argument name="valueHandlerPool" xsi:type="object">VindiCardCardValueHandlerPool</argument>
+            <argument name="validatorPool" xsi:type="object">VindiCardCardValidatorPool</argument>
+            <argument name="commandPool" xsi:type="object">VindiCardCardCommandPool</argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="VindiCardCardConfig" type="Magento\Payment\Gateway\Config\Config">
+        <arguments>
+            <argument name="methodCode" xsi:type="const">\Vindi\VP\Model\Ui\CardCard\ConfigProvider::CODE</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Payment Method Facade configuration for Card + Bolepix -->
+    <virtualType name="VindiPaymentCardBankSlipPixFacade" type="Magento\Payment\Model\Method\Adapter">
+        <arguments>
+            <argument name="code" xsi:type="const">\Vindi\VP\Model\Ui\CardBankSlipPix\ConfigProvider::CODE</argument>
+            <argument name="formBlockType" xsi:type="string">Magento\Payment\Block\Form</argument>
+            <argument name="infoBlockType" xsi:type="string">Vindi\VP\Block\Info\CardBankSlipPix</argument>
+            <argument name="valueHandlerPool" xsi:type="object">VindiCardBankSlipPixValueHandlerPool</argument>
+            <argument name="validatorPool" xsi:type="object">VindiCardBankSlipPixValidatorPool</argument>
+            <argument name="commandPool" xsi:type="object">VindiCardBankSlipPixCommandPool</argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="VindiCardBankSlipPixConfig" type="Magento\Payment\Gateway\Config\Config">
+        <arguments>
+            <argument name="methodCode" xsi:type="const">\Vindi\VP\Model\Ui\CardBankSlipPix\ConfigProvider::CODE</argument>
+        </arguments>
+    </virtualType>
+
+
     <!-- Commands infrastructure -->
     <virtualType name="VindiBankSlipCommandPool" type="Magento\Payment\Gateway\Command\CommandPool">
         <arguments>
