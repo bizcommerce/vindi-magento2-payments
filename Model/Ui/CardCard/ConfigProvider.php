@@ -11,21 +11,22 @@
 
 namespace Vindi\VP\Model\Ui\CardCard;
 
-use Magento\Checkout\Model\Session;
+use Magento\Checkout\Model\ConfigProviderInterface;
+use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Customer\Model\Session as CustomerSession;
-use Vindi\VP\Helper\Data;
 use Magento\Payment\Helper\Data as PaymentHelper;
 use Magento\Payment\Model\CcConfig;
 use Magento\Payment\Model\CcGenericConfigProvider;
-use Magento\Framework\UrlInterface;
-use Magento\Framework\View\Asset\Source;
+use Vindi\VP\Helper\Data as HelperData;
+use Vindi\VP\Model\ResourceModel\PaymentProfile\Collection as PaymentProfileCollection;
+use Vindi\VP\Model\Config\Source\CardImages as CardImagesSource;
 
-class ConfigProvider extends CcGenericConfigProvider
+class ConfigProvider extends CcGenericConfigProvider implements ConfigProviderInterface
 {
     public const CODE = 'vindi_vp_cardcard';
 
     /**
-     * @var Session
+     * @var CheckoutSession
      */
     protected $checkoutSession;
 
@@ -35,81 +36,121 @@ class ConfigProvider extends CcGenericConfigProvider
     protected $customerSession;
 
     /**
-     * @var Data
+     * @var HelperData
      */
-    protected $helper;
+    protected $helperData;
 
     /**
-     * @var UrlInterface
+     * @var PaymentProfileCollection
      */
-    protected $urlBuilder;
+    protected $paymentProfileCollection;
 
     /**
-     * @var Source
+     * @var CardImagesSource
      */
-    protected $assetSource;
+    protected $creditCardTypeSource;
 
     /**
-     * @param Session $checkoutSession
-     * @param CustomerSession $customerSession
-     * @param Data $helper
-     * @param CcConfig $ccConfig
-     * @param UrlInterface $urlBuilder
-     * @param PaymentHelper $paymentHelper
-     * @param Source $assetSource
+     * @param CcConfig                   $ccConfig
+     * @param PaymentHelper              $paymentHelper
+     * @param HelperData                 $helperData
+     * @param CustomerSession            $customerSession
+     * @param CheckoutSession            $checkoutSession
+     * @param PaymentProfileCollection   $paymentProfileCollection
+     * @param CardImagesSource           $creditCardTypeSource
      */
     public function __construct(
-        Session $checkoutSession,
-        CustomerSession $customerSession,
-        Data $helper,
         CcConfig $ccConfig,
-        UrlInterface $urlBuilder,
         PaymentHelper $paymentHelper,
-        Source $assetSource
+        HelperData $helperData,
+        CustomerSession $customerSession,
+        CheckoutSession $checkoutSession,
+        PaymentProfileCollection $paymentProfileCollection,
+        CardImagesSource $creditCardTypeSource
     ) {
         parent::__construct($ccConfig, $paymentHelper, [self::CODE]);
-        $this->checkoutSession = $checkoutSession;
-        $this->customerSession = $customerSession;
-        $this->helper = $helper;
-        $this->urlBuilder = $urlBuilder;
-        $this->assetSource = $assetSource;
+        $this->helperData               = $helperData;
+        $this->customerSession          = $customerSession;
+        $this->checkoutSession          = $checkoutSession;
+        $this->paymentProfileCollection = $paymentProfileCollection;
+        $this->creditCardTypeSource     = $creditCardTypeSource;
     }
 
     /**
-     * Retrieve assoc array of checkout configuration
-     *
-     * @return array
+     * {@inheritdoc}
      */
-    public function getConfig()
+    public function getConfig(): array
     {
-        $grandTotal = $this->checkoutSession->getQuote()->getGrandTotal();
         $customerTaxvat = '';
-        $customer = $this->customerSession->getCustomer();
+        $customer       = $this->customerSession->getCustomer();
         if ($customer && $customer->getTaxvat()) {
-            $taxVat = preg_replace('/[^0-9]/', '', (string)$customer->getTaxvat());
-            $customerTaxvat = strlen($taxVat) == 11 ? $taxVat : '';
+            $raw = preg_replace('/\D/', '', (string)$customer->getTaxvat());
+            $customerTaxvat = (strlen($raw) === 11) ? $raw : '';
         }
+
+        $grandTotal = $this->checkoutSession->getQuote()->getGrandTotal();
+
         return [
             'payment' => [
                 self::CODE => [
-                    'grand_total'      => $grandTotal,
-                    'customer_taxvat'  => $customerTaxvat,
-                    'sandbox'          => (int)$this->helper->getGeneralConfig('use_sandbox'),
-                    'availableTypes'   => $this->getCcAvailableTypes(self::CODE)
-                ],
-                'ccform' => [
-                    'grandTotal'      => [self::CODE => $grandTotal],
-                    'months'          => [self::CODE => $this->getCcMonths()],
-                    'years'           => [self::CODE => $this->getCcYears()],
-                    'hasVerification' => [self::CODE => $this->hasVerification(self::CODE)],
-                    'cvvImageUrl'     => [self::CODE => $this->getCvvImageUrl()],
-                    'urls'            => [
-                        self::CODE => [
-                            'retrieve_installments' => $this->urlBuilder->getUrl('vindi_vp/installments/retrieve')
-                        ]
-                    ]
+                    'availableTypes'             => $this->getCcAvailableTypes(),
+                    'months'                     => [self::CODE => $this->getCcMonths()],
+                    'years'                      => [self::CODE => $this->getCcYears()],
+                    'hasVerification'            => [self::CODE => $this->hasVerification(self::CODE)],
+                    'isInstallmentsAllowedInStore' => (int)$this->helperData->isInstallmentsAllowedInStore(),
+                    'maxInstallments'            => (int)$this->helperData->getMaxInstallments() ?: 1,
+                    'minInstallmentsValue'       => (int)$this->helperData->getMinInstallmentsValue(),
+                    'saved_cards'                => $this->getPaymentProfiles(),
+                    'credit_card_images'         => $this->getCreditCardImages(),
+                    'double_card_enabled'        => true,
+                    'enabledDocument'            => true,
+                    'customer_taxvat'            => $customerTaxvat,
+                    'grand_total'                => $grandTotal
                 ]
             ]
         ];
+    }
+
+    /**
+     * Get saved payment profiles.
+     *
+     * @return array
+     */
+    protected function getPaymentProfiles(): array
+    {
+        $profiles = [];
+        if ($this->customerSession->isLoggedIn()) {
+            $customerId = $this->customerSession->getCustomerId();
+            $this->paymentProfileCollection
+                ->addFieldToFilter('customer_id', $customerId)
+                ->addFieldToFilter('cc_type', ['neq' => '']);
+            foreach ($this->paymentProfileCollection as $profile) {
+                $profiles[] = [
+                    'id'          => $profile->getId(),
+                    'card_number' => (string)$profile->getCcLast4(),
+                    'card_type'   => (string)$profile->getCcType()
+                ];
+            }
+        }
+        return $profiles;
+    }
+
+    /**
+     * Get credit card images.
+     *
+     * @return array
+     */
+    protected function getCreditCardImages(): array
+    {
+        $images  = [];
+        $options = $this->creditCardTypeSource->toOptionArray();
+        foreach ($options as $opt) {
+            $images[] = [
+                'code'  => $opt['code'],
+                'label' => $opt['label'],
+                'value' => $opt['value']
+            ];
+        }
+        return $images;
     }
 }
