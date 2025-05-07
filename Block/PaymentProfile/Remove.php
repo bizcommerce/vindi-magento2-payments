@@ -60,7 +60,7 @@ class Remove extends Template
     /**
      * Retrieve current payment profile based on ID in URL.
      *
-     * @return \Vindi\VP\Model\PaymentProfile|null
+     * @return \Vindi\VP\Model\CreditCard|null
      */
     public function getPaymentProfile()
     {

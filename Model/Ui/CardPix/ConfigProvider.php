@@ -19,7 +19,7 @@ use Magento\Framework\App\RequestInterface;
 use Magento\Payment\Helper\Data as PaymentHelper;
 use Vindi\VP\Helper\Data as HelperData;
 use Vindi\VP\Model\Config\Source\CardImages as CardImagesSource;
-use Vindi\VP\Model\ResourceModel\PaymentProfile\Collection as PaymentProfileCollection;
+use Vindi\VP\Model\ResourceModel\CreditCard\Collection as PaymentProfileCollection;
 
 class ConfigProvider implements ConfigProviderInterface
 {

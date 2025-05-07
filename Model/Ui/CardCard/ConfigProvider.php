@@ -18,7 +18,7 @@ use Magento\Payment\Helper\Data as PaymentHelper;
 use Magento\Payment\Model\CcConfig;
 use Magento\Payment\Model\CcGenericConfigProvider;
 use Vindi\VP\Helper\Data as HelperData;
-use Vindi\VP\Model\ResourceModel\PaymentProfile\Collection as PaymentProfileCollection;
+use Vindi\VP\Model\ResourceModel\CreditCard\Collection as PaymentProfileCollection;
 use Vindi\VP\Model\Config\Source\CardImages as CardImagesSource;
 
 class ConfigProvider extends CcGenericConfigProvider implements ConfigProviderInterface
