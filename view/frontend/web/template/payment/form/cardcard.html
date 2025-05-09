@@ -1,27 +1,18 @@
-<!-- File: app/code/Vindi/VP/view/frontend/web/template/payment/vindi-vp-cardcard.html -->
 <!--
-/**
- * @category    Vindi
- * @package     Vindi_VP
- *
- * Template for two-card payment method, with separate sections for each card.
- */
+  Multi-card payment template
+  @category Vindi
+  @package Vindi_VP
 -->
-<div class="payment-method" data-bind="css: {'_active': (getCode() == isChecked())}">
+<div class="payment-method" data-bind="css: {'_active': getCode()==isChecked()}">
     <div class="payment-method-title field choice">
-        <input type="radio"
-               name="payment[method]"
-               class="radio"
-               data-bind="attr: { id: getCode() },
-                          value: getCode(),
-                          checked: isChecked,
-                          click: selectPaymentMethod,
-                          visible: isRadioButtonVisible()" />
-        <label data-bind="attr: { for: getCode() }" class="label">
-            <span data-bind="text: getTitle()"></span>
+        <input type="radio" name="payment[method]" class="radio"
+               data-bind="attr:{id:getCode()}, value:getCode(), checked:isChecked, click:selectPaymentMethod, visible:isRadioButtonVisible()"/>
+        <label data-bind="attr:{for:getCode()}" class="label">
+            <span data-bind="text:getTitle()"></span>
         </label>
     </div>
-    <div class="payment-method-content" data-bind="visible: isChecked()">
+    <div class="payment-method-content">
+        <!-- messages region -->
         <!-- ko foreach: getRegion('messages') -->
         <!-- ko template: getTemplate() --><!-- /ko -->
         <!-- /ko -->
@@ -35,26 +26,171 @@
         <div class="cc-payment-section">
             <h3 data-bind="i18n: 'First Card Payment'"></h3>
             <div class="field amount required" style="max-width:500px;">
-                <label class="label"><span data-bind="i18n: 'Amount for First Card:'"></span></label>
+                <label class="label"><span data-bind="i18n:'Amount for First Card:'"></span></label>
                 <div class="control">
-                    <input type="number"
-                           class="input-text"
-                           data-bind="value: creditAmountDisplay,
-                                      enable: isFirstCardEditable,
-                                      attr: { placeholder: $t('0.00') },
-                                      css: { 'error-border': firstCardInvalid() }" />
+                    <input type="number" class="input-text"
+                           data-bind="value:creditAmountDisplay, enable:isFirstCardEditable,
+                            attr:{placeholder:$t('0.00')},
+                            css:{'error-border':firstCardInvalid()}"/>
                     <!-- ko if: firstCardInvalid -->
                     <div class="error-message"
-                         data-bind="text: $t('First Card amount cannot exceed order total of ') + formattedOrderTotal()">
-                    </div>
+                         data-bind="text:$t('Value cannot exceed order total of ') + formattedOrderTotal()"></div>
                     <!-- /ko -->
                 </div>
             </div>
             <form class="form container-vindi">
-                <fieldset data-bind="attr: { class: 'fieldset payment items ccard ' + getCode(),
-                                              id: 'payment_form_' + getCode() }"
-                          style="max-width:500px;">
-                    <!-- ko template: getTemplate() --><!-- /ko -->
+                <fieldset data-bind="attr:{class:'fieldset payment items ccard '+getCode(),
+                                 id:'payment_form_'+getCode()}" style="max-width:500px;">
+                    <legend class="legend"><span data-bind="i18n:'First Card'"></span></legend><br/>
+
+                    <!-- Saved profiles -->
+                    <!-- ko if: hasPaymentProfiles() -->
+                    <div class="field number required">
+                        <label data-bind="attr:{for:getCode()+'_cc_payment_profile'}" class="label">
+                            <span data-bind="i18n:'Your saved cards'"></span>
+                        </label>
+                        <div class="control">
+                            <select name="payment[payment_profile1]" class="input-text select"
+                                    data-bind="attr:{
+                         id:getCode()+'_cc_payment_profile',
+                         'data-validate':JSON.stringify({
+                           'required-number':true,
+                           'validate-card-type':getCcAvailableTypesValues(),
+                           'validate-card-number':'#'+getCode()+'_cc_type',
+                           'validate-cc-type':'#'+getCode()+'_cc_type'
+                         })
+                      },
+                      enable:isActive($parents),
+                      options:getPaymentProfiles(),
+                      optionsValue:'value',
+                      optionsText:'text',
+                      optionsCaption:$t('New Card'),
+                      value:selectedPaymentProfile"></select>
+                        </div>
+                    </div>
+                    <!-- /ko -->
+
+                    <!-- Card inputs -->
+                    <div class="field number cc-number required vindi-cc-number-container"
+                         data-bind="visible:!selectedPaymentProfile()">
+                        <div class="credit-card-types-container">
+                            <ul class="credit-card-types">
+                                <!-- ko foreach:{data:getCcAvailableTypesValues(),as:'item'} -->
+                                <li class="item"
+                                    data-bind="css:{
+                      _active:$parent.selectedCardType()==item.value,
+                      _inactive:$parent.selectedCardType()!=null &&
+                                $parent.selectedCardType()!=item.value
+                    }">
+                                    <!-- ko if:$parent.getIcons(item.value) -->
+                                    <img data-bind="attr:{
+                    src:$parent.getIcons(item.value).url,
+                    alt:item.type,
+                    width:$parent.getIcons(item.value).width,
+                    height:$parent.getIcons(item.value).height
+                  }"/>
+                                    <!-- /ko -->
+                                </li>
+                                <!-- /ko -->
+                            </ul>
+                            <input type="hidden" name="payment[cc_type1]" class="input-text-vindi"
+                                   data-bind="attr:{
+                       id:getCode()+'_cc_type',
+                       'data-container':getCode()+'-cc-type'
+                     }, value:creditCardType"/>
+                        </div>
+                        <div class="control">
+                            <input name="payment[cc_number1]" type="number" class="input-text-vindi"
+                                   data-bind="attr:{
+                       autocomplete:'off',
+                       id:getCode()+'_cc_number',
+                       placeholder:$t('Card Number'),
+                       'data-validate':JSON.stringify({
+                         'required-number':true,
+                         'validate-vindi-card-number':'#'+getCode()+'_cc_number'
+                       })
+                     },
+                     enable:isActive($parents),
+                     value:vindiCreditCardNumber,
+                     valueUpdate:'keyup'"/>
+                        </div>
+                    </div>
+
+                    <div class="field number required"
+                         data-bind="attr:{id:getCode()+'-cc-owner-container'},
+                          visible:!selectedPaymentProfile()">
+                        <div class="control">
+                            <input type="text" name="payment[cc_owner1]" class="input-text-vindi"
+                                   data-bind="attr:{
+                       id:getCode()+'_cc_owner',
+                       placeholder:$t('Name on Card'),
+                       'data-validate':JSON.stringify({'required-number':true})
+                     },
+                     enable:isActive($parents),
+                     value:creditCardOwner,
+                     valueUpdate:'keyup'"/>
+                        </div>
+                    </div>
+
+                    <div class="field number required vindi-cc-exp-cvv"
+                         data-bind="visible:!selectedPaymentProfile()">
+            <span data-bind="attr:{id:getCode()+'-cc-exp-date-container'}">
+              <input type="text" name="payment[cc_exp_date1]" class="input-text-vindi"
+                     pattern="\d{2}\/\d{2}" maxlength="5" inputmode="numeric"
+                     oninput="this.value=this.value
+                       .replace(/\D/g,'')
+                       .replace(/^(\d{2})(\d)/,'$1/$2')
+                       .substr(0,5);"
+                     data-bind="attr:{
+                       id:getCode()+'_cc_exp_date',
+                       placeholder:$t('Expiration Date'),
+                       'data-validate':JSON.stringify({'required-number':true})
+                     },
+                     enable:isActive($parents),
+                     value:creditCardExpDate,
+                     valueUpdate:'keyup'"/>
+            </span>
+                        <!-- ko if:hasVerification() -->
+                        <span data-bind="attr:{id:getCode()+'-cc-cvv'}">
+              <input type="text" name="payment[cc_cvv1]" class="input-text-vindi"
+                     maxlength="4" autocomplete="off"
+                     data-bind="attr:{
+                       id:getCode()+'_cc_cid',
+                       placeholder:$t('CVV'),
+                       'data-validate':JSON.stringify({
+                         'required-number':true,
+                         'validate-number':'#'+getCode()+'_cc_type'
+                       })
+                     },
+                     enable:isActive($parents),
+                     value:creditCardVerificationNumber"/>
+            </span>
+                        <!-- /ko -->
+                    </div>
+
+                    <!-- ko if:installmentsAllowed() -->
+                    <div class="field number required installments"
+                         data-bind="attr:{id:getCode()+'_installments1'}">
+                        <div class="control">
+                            <select name="payment[cc_installments1]" class="select credit-card-installments"
+                                    data-bind="attr:{
+                        id:getCode()+'_installments1',
+                        'data-validate':JSON.stringify({
+                          required:true,
+                          'validate-cc-exp':'#'+getCode()+'_expiration_yr'
+                        })
+                      },
+                      enable:isActive($parents),
+                      disable:isInstallmentsDisabled,
+                      options:creditCardInstallments,
+                      optionsValue:'value',
+                      optionsText:'text',
+                      optionsCaption:$t('Installments'),
+                      value:selectedInstallments"/>
+                        </div>
+                    </div>
+                    <!-- /ko -->
+
                 </fieldset>
             </form>
         </div>
@@ -63,47 +199,222 @@
 
         <!-- Second Card Section -->
         <div class="cc-payment-section">
-            <h3 data-bind="i18n: 'Second Card Payment'"></h3>
+            <h3 data-bind="i18n:'Second Card Payment'"></h3>
             <div class="field amount required" style="max-width:500px;">
-                <label class="label"><span data-bind="i18n: 'Amount for Second Card:'"></span></label>
+                <label class="label"><span data-bind="i18n:'Amount for Second Card:'"></span></label>
                 <div class="control">
-                    <input type="number"
-                           class="input-text"
-                           data-bind="value: secondCardAmountDisplay,
-                                      enable: isSecondCardEditable,
-                                      attr: { placeholder: $t('0.00') },
-                                      css: { 'error-border': secondCardInvalid() }" />
-                    <!-- ko if: secondCardInvalid -->
+                    <input type="number" class="input-text"
+                           data-bind="value:secondCardAmountDisplay,
+                            enable:isSecondCardEditable,
+                            attr:{placeholder:$t('0.00')},
+                            css:{'error-border':secondCardInvalid()}"/>
+                    <!-- ko if:secondCardInvalid -->
                     <div class="error-message"
-                         data-bind="text: $t('Second Card amount cannot exceed order total of ') + formattedOrderTotal()">
-                    </div>
+                         data-bind="text:$t('Value cannot exceed order total of ') + formattedOrderTotal()"></div>
                     <!-- /ko -->
                 </div>
             </div>
             <form class="form container-vindi">
-                <fieldset data-bind="attr: { class: 'fieldset payment items ccard ' + getCode(),
-                                              id: 'payment_form_second_' + getCode() }"
+                <fieldset data-bind="attr:{class:'fieldset payment items ccard '+getCode(),
+                                 id:'payment_form_second_'+getCode()}"
                           style="max-width:500px;">
-                    <!-- ko template: getTemplate() --><!-- /ko -->
+                    <legend class="legend"><span data-bind="i18n:'Second Card'"></span></legend><br/>
+
+                    <!-- Saved profiles -->
+                    <!-- ko if:hasPaymentProfiles2() -->
+                    <div class="field number required">
+                        <label data-bind="attr:{for:getCode()+'_cc_payment_profile2'}" class="label">
+                            <span data-bind="i18n:'Your saved cards'"></span>
+                        </label>
+                        <div class="control">
+                            <select name="payment[payment_profile2]" class="input-text select"
+                                    data-bind="attr:{
+                         id:getCode()+'_cc_payment_profile2',
+                         'data-validate':JSON.stringify({
+                           'required-number':true,
+                           'validate-card-type':getCcAvailableTypesValues(),
+                           'validate-card-number':'#'+getCode()+'_cc_type2',
+                           'validate-cc-type':'#'+getCode()+'_cc_type2'
+                         })
+                      },
+                      enable:isActive($parents),
+                      options:getPaymentProfiles(),
+                      optionsValue:'value',
+                      optionsText:'text',
+                      optionsCaption:$t('New Card'),
+                      value:selectedPaymentProfile2"></select>
+                        </div>
+                    </div>
+                    <!-- /ko -->
+
+                    <!-- Card inputs second -->
+                    <div class="field number cc-number required vindi-cc-number-container"
+                         data-bind="visible:!selectedPaymentProfile2()">
+                        <div class="credit-card-types-container">
+                            <ul class="credit-card-types">
+                                <!-- ko foreach:{data:getCcAvailableTypesValues(),as:'item'} -->
+                                <li class="item"
+                                    data-bind="css:{
+                      _active:$parent.selectedCardType2()==item.value,
+                      _inactive:$parent.selectedCardType2()!=null &&
+                                $parent.selectedCardType2()!=item.value
+                    }">
+                                    <!-- ko if:$parent.getIcons(item.value) -->
+                                    <img data-bind="attr:{
+                    src:$parent.getIcons(item.value).url,
+                    alt:item.type,
+                    width:$parent.getIcons(item.value).width,
+                    height:$parent.getIcons(item.value).height
+                  }"/>
+                                    <!-- /ko -->
+                                </li>
+                                <!-- /ko -->
+                            </ul>
+                            <input type="hidden" name="payment[cc_type2]" class="input-text-vindi"
+                                   data-bind="attr:{
+                       id:getCode()+'_cc_type2',
+                       'data-container':getCode()+'-cc-type2'
+                     }, value:creditCardType2"/>
+                        </div>
+                        <div class="control">
+                            <input name="payment[cc_number2]" type="number" class="input-text-vindi"
+                                   data-bind="attr:{
+                       autocomplete:'off',
+                       id:getCode()+'_cc_number2',
+                       placeholder:$t('Card Number'),
+                       'data-validate':JSON.stringify({
+                         'required-number':true,
+                         'validate-vindi-card-number':'#'+getCode()+'_cc_number2'
+                       })
+                     },
+                     enable:isActive($parents),
+                     value:vindiCreditCardNumber2,
+                     valueUpdate:'keyup'"/>
+                        </div>
+                    </div>
+
+                    <div class="field number required"
+                         data-bind="attr:{id:getCode()+'-cc-owner2-container'},
+                          visible:!selectedPaymentProfile2()">
+                        <div class="control">
+                            <input type="text" name="payment[cc_owner2]" class="input-text-vindi"
+                                   data-bind="attr:{
+                       id:getCode()+'_cc_owner2',
+                       placeholder:$t('Name on Card'),
+                       'data-validate':JSON.stringify({'required-number':true})
+                     },
+                     enable:isActive($parents),
+                     value:creditCardOwner2,
+                     valueUpdate:'keyup'"/>
+                        </div>
+                    </div>
+
+                    <div class="field number required vindi-cc-exp-cvv"
+                         data-bind="visible:!selectedPaymentProfile2()">
+            <span data-bind="attr:{id:getCode()+'-cc-exp-date2-container'}">
+              <input type="text" name="payment[cc_exp_date2]" class="input-text-vindi"
+                     pattern="\d{2}\/\d{2}" maxlength="5" inputmode="numeric"
+                     oninput="this.value=this.value
+                       .replace(/\D/g,'')
+                       .replace(/^(\d{2})(\d)/,'$1/$2')
+                       .substr(0,5);"
+                     data-bind="attr:{
+                       id:getCode()+'_cc_exp_date2',
+                       placeholder:$t('Expiration Date'),
+                       'data-validate':JSON.stringify({'required-number':true})
+                     },
+                     enable:isActive($parents),
+                     value:creditCardExpDate2,
+                     valueUpdate:'keyup'"/>
+            </span>
+                        <!-- ko if:hasVerification() -->
+                        <span data-bind="attr:{id:getCode()+'-cc-cvv2'}">
+              <input type="text" name="payment[cc_cvv2]" class="input-text-vindi"
+                     maxlength="4" autocomplete="off"
+                     data-bind="attr:{
+                       id:getCode()+'_cc_cid2',
+                       placeholder:$t('CVV'),
+                       'data-validate':JSON.stringify({
+                         'required-number':true,
+                         'validate-number':'#'+getCode()+'_cc_type2'
+                       })
+                     },
+                     enable:isActive($parents),
+                     value:creditCardVerificationNumber2"/>
+            </span>
+                        <!-- /ko -->
+                    </div>
+
+                    <!-- ko if:installmentsAllowed() -->
+                    <div class="field number required installments"
+                         data-bind="attr:{id:getCode()+'_installments2'}">
+                        <div class="control">
+                            <select name="payment[cc_installments2]" class="select credit-card-installments"
+                                    data-bind="attr:{
+                        id:getCode()+'_installments2',
+                        'data-validate':JSON.stringify({
+                          required:true,
+                          'validate-cc-exp':'#'+getCode()+'_expiration_yr2'
+                        })
+                      },
+                      enable:isActive($parents),
+                      disable:isInstallmentsDisabled2,
+                      options:creditCardInstallments2,
+                      optionsValue:'value',
+                      optionsText:'text',
+                      optionsCaption:$t('Installments'),
+                      value:selectedInstallments2"/>
+                        </div>
+                    </div>
+                    <!-- /ko -->
+
                 </fieldset>
             </form>
+
+            <!-- Document field if active -->
+            <!-- ko if:isActiveDocument() -->
+            <br/>
+            <form class="form">
+                <fieldset data-bind="attr:{id:'payment_form_doc_'+getCode()}">
+                    <div class="field number required" data-bind="attr:{id:getCode()+'_document'}">
+                        <label data-bind="attr:{for:getCode()+'_document'}" class="label">
+                            <span><!-- ko i18n:'CPF/CNPJ' --><!-- /ko --></span>
+                        </label>
+                        <div class="control">
+                            <input type="text" name="payment[_document]" class="input-text"
+                                   data-bind="attr:{
+                       autocomplete:'on',
+                       id:getCode()+'_document',
+                       title:$t('CPF'),
+                       'data-validate':JSON.stringify({'required-number':true}),
+                       maxlength:18
+                     },
+                     value:taxvat.value,
+                     valueUpdate:'keyup',
+                     event:{keyup:checkCpf}"/>
+                            <span id="cpfResponse"></span>
+                        </div>
+                    </div>
+                </fieldset>
+            </form>
+            <!-- /ko -->
+
         </div>
 
         <div class="checkout-agreements-block">
-            <!-- ko foreach: $parent.getRegion('before-place-order') -->
-            <!-- ko template: getTemplate() --><!-- /ko -->
+            <!-- ko foreach:$parent.getRegion('before-place-order') -->
+            <!-- ko template:getTemplate() --><!-- /ko -->
             <!-- /ko -->
         </div>
 
         <div class="actions-toolbar">
             <div class="primary">
-                <button class="action primary checkout"
-                        type="submit"
-                        data-bind="click: placeOrder,
-                                   attr: { title: $t('Place Order') },
-                                   css: { disabled: !isPlaceOrderActionAllowed() },
-                                   enable: (getCode() == isChecked())">
-                    <span data-bind="i18n: 'Place Order'"></span>
+                <button class="action primary checkout" type="submit"
+                        data-bind="click:placeOrder,
+                           attr:{title:$t('Place Order')},
+                           css:{disabled:!isPlaceOrderActionAllowed()},
+                           enable:getCode()==isChecked()">
+                    <span data-bind="i18n:'Place Order'"></span>
                 </button>
             </div>
         </div>
