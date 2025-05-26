@@ -140,6 +140,11 @@ define(
                 self.installmentsDisabled(true);
                 this.updateInstallmentsValues();
 
+                // Add event listener for card_amount input
+                $(document).on('blur', '#card_amount', function() {
+                    alert("Ola mundo");
+                });
+
                 return this;
             },
 
