@@ -51,4 +51,11 @@
             </argument>
         </arguments>
     </type>
+    <type name="Magento\Checkout\Model\CompositeConfigProvider">
+        <arguments>
+            <argument name="configProviders" xsi:type="array">
+                <item name="vindi_vp_cardpix" xsi:type="object">Vindi\VP\Model\Ui\CardPix\ConfigProvider</item>
+            </argument>
+        </arguments>
+    </type>
 </config>

@@ -40,7 +40,11 @@
                                                                             <item name="isBillingAddressRequired" xsi:type="boolean">true</item>
                                                                         </item>
                                                                         <item name="vindi_vp_cardpix" xsi:type="array">
-                                                                            <item name="isBillingAddressRequired" xsi:type="boolean">true</item>
+                                                                            <item name="component" xsi:type="string">Vindi_VP/js/view/payment/method-renderer/cardpix</item>
+                                                                            <item name="config" xsi:type="array">
+                                                                                <item name="isBillingAddressRequired" xsi:type="boolean">true</item>
+                                                                            </item>
+                                                                            <item name="sortOrder" xsi:type="string">55</item>
                                                                         </item>
                                                                         <item name="vindi_vp_cardcard" xsi:type="array">
                                                                             <item name="isBillingAddressRequired" xsi:type="boolean">true</item>

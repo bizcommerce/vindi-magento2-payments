@@ -1,168 +1,201 @@
 <?php
+
 /**
- * Card + Pix ConfigProvider for Vindi VP.
+ * Vindi
  *
  * DISCLAIMER
- * Do not edit or add to this file if you wish to upgrade this extension to a newer version in the future.
+ *
+ * Do not edit or add to this file if you wish to upgrade this extension to newer
+ * version in the future.
  *
  * @category    Vindi
  * @package     Vindi_VP
+ * @copyright   Copyright (c) Vindi
+ *
  */
 
 namespace Vindi\VP\Model\Ui\CardPix;
 
-use Magento\Checkout\Model\ConfigProviderInterface;
-use Magento\Checkout\Model\Session as CheckoutSession;
+use Vindi\VP\Helper\Data;
+use Vindi\VP\Model\ResourceModel\CreditCard\CollectionFactory as CreditCardCollectionFactory;
+use Magento\Checkout\Model\Session;
 use Magento\Customer\Model\Session as CustomerSession;
-use Magento\Framework\View\Asset\Repository;
-use Magento\Framework\App\RequestInterface;
+use Magento\Framework\UrlInterface;
+use Magento\Framework\View\Asset\Source;
 use Magento\Payment\Helper\Data as PaymentHelper;
-use Vindi\VP\Helper\Data as HelperData;
-use Vindi\VP\Model\Config\Source\CardImages as CardImagesSource;
-use Vindi\VP\Model\ResourceModel\CreditCard\Collection as PaymentProfileCollection;
+use Magento\Payment\Model\CcConfig;
+use Magento\Payment\Model\CcGenericConfigProvider;
 
-class ConfigProvider implements ConfigProviderInterface
+/**
+ * Class ConfigProvider
+ */
+class ConfigProvider extends CcGenericConfigProvider
 {
     public const CODE = 'vindi_vp_cardpix';
 
+    protected $icons = [];
+
     /**
-     * @var CheckoutSession
+     * @var Session
      */
     protected $checkoutSession;
 
     /**
-     * @var CustomerSession
+     * @var CustomerSession $customerSession
      */
     protected $customerSession;
 
     /**
-     * @var Repository
-     */
-    protected $assetRepo;
-
-    /**
-     * @var RequestInterface
-     */
-    protected $request;
-
-    /**
-     * @var PaymentHelper
-     */
-    protected $paymentHelper;
-
-    /**
-     * @var HelperData
+     * @var Data
      */
     protected $helper;
 
     /**
-     * @var PaymentProfileCollection
+     * @var UrlInterface
      */
-    protected $paymentProfileCollection;
+    private $urlBuilder;
 
     /**
-     * @var CardImagesSource
+     * @var Source
      */
-    protected $creditCardTypeSource;
+    protected $assetSource;
 
     /**
-     * @param CheckoutSession          $checkoutSession
-     * @param CustomerSession          $customerSession
-     * @param Repository               $assetRepo
-     * @param RequestInterface         $request
-     * @param PaymentHelper            $paymentHelper
-     * @param HelperData               $helper
-     * @param PaymentProfileCollection $paymentProfileCollection
-     * @param CardImagesSource         $creditCardTypeSource
+     * @var CreditCardCollectionFactory
+     */
+    protected $creditCardCollectionFactory;
+
+    /**
+     * @param Session $checkoutSession
+     * @param CustomerSession $customerSession
+     * @param Data $helper
+     * @param CcConfig $ccConfig
+     * @param UrlInterface $urlBuilder
+     * @param PaymentHelper $paymentHelper
+     * @param Source $assetSource
+     * @param CreditCardCollectionFactory $creditCardCollectionFactory
      */
     public function __construct(
-        CheckoutSession $checkoutSession,
+        Session $checkoutSession,
         CustomerSession $customerSession,
-        Repository $assetRepo,
-        RequestInterface $request,
+        Data $helper,
+        CcConfig $ccConfig,
+        UrlInterface $urlBuilder,
         PaymentHelper $paymentHelper,
-        HelperData $helper,
-        PaymentProfileCollection $paymentProfileCollection,
-        CardImagesSource $creditCardTypeSource
+        Source $assetSource,
+        CreditCardCollectionFactory $creditCardCollectionFactory
     ) {
-        $this->checkoutSession          = $checkoutSession;
-        $this->customerSession          = $customerSession;
-        $this->assetRepo                = $assetRepo;
-        $this->request                  = $request;
-        $this->paymentHelper            = $paymentHelper;
-        $this->helper                   = $helper;
-        $this->paymentProfileCollection = $paymentProfileCollection;
-        $this->creditCardTypeSource     = $creditCardTypeSource;
+        parent::__construct($ccConfig, $paymentHelper, [self::CODE]);
+        $this->checkoutSession = $checkoutSession;
+        $this->customerSession = $customerSession;
+        $this->helper = $helper;
+        $this->urlBuilder = $urlBuilder;
+        $this->assetSource = $assetSource;
+        $this->creditCardCollectionFactory = $creditCardCollectionFactory;
     }
 
     /**
      * Retrieve assoc array of checkout configuration
      *
      * @return array
+     * @throws \Magento\Framework\Exception\LocalizedException
+     * @throws \Magento\Framework\Exception\NoSuchEntityException
      */
-    public function getConfig(): array
+    public function getConfig()
     {
+        $grandTotal = $this->checkoutSession->getQuote()->getGrandTotal();
+        $methodCode = self::CODE;
+
         $customerTaxvat = '';
-        $customer       = $this->customerSession->getCustomer();
+        $customer = $this->customerSession->getCustomer();
         if ($customer && $customer->getTaxvat()) {
-            $taxVat        = preg_replace('/\D/', '', (string)$customer->getTaxvat());
-            $customerTaxvat = (strlen($taxVat) === 11) ? $taxVat : '';
+            $taxVat = preg_replace('/[^0-9]/', '', (string) $customer->getTaxvat());
+            $customerTaxvat = strlen($taxVat) == 11 ? $taxVat : '';
         }
 
         return [
             'payment' => [
                 self::CODE => [
-                    'grand_total'           => $this->checkoutSession->getQuote()->getGrandTotal(),
-                    'checkout_instructions' => trim($this->helper->getConfig('checkout_instructions', self::CODE)),
-                    'customer_taxvat'       => $customerTaxvat,
-                    'sandbox'               => (int)$this->helper->getGeneralConfig('use_sandbox'),
-                    'saved_cards'           => $this->getPaymentProfiles(),
-                    'credit_card_images'    => $this->getCreditCardImages()
+                    'grand_total' => $grandTotal,
+                    'customer_taxvat' => $customerTaxvat,
+                    'sandbox' => (int) $this->helper->getGeneralConfig('use_sandbox'),
+                    'fingerprint_url' => \Vindi\VP\Helper\Data::FINGERPRINT_URL,
+                    'icons' => $this->getIcons(),
+                    'availableTypes' => $this->getCcAvailableTypes($methodCode),
+                    'saved_cards' => $this->getSavedCreditCards()
+                ],
+                'ccform' => [
+                    'grandTotal' => [$methodCode => $grandTotal],
+                    'months' => [$methodCode => $this->getCcMonths()],
+                    'years' => [$methodCode => $this->getCcYears()],
+                    'hasVerification' => [$methodCode => $this->hasVerification($methodCode)],
+                    'cvvImageUrl' => [$methodCode => $this->getCvvImageUrl()],
+                    'urls' => [
+                        $methodCode => [
+                            'retrieve_installments' => $this->urlBuilder->getUrl('vindi_vp/installments/retrieve')
+                        ]
+                    ]
                 ]
             ]
         ];
     }
 
     /**
-     * Get saved payment profiles
+     * Get saved credit cards for logged-in customers
      *
      * @return array
      */
-    protected function getPaymentProfiles(): array
+    public function getSavedCreditCards()
     {
-        $profiles = [];
-        if ($this->customerSession->isLoggedIn()) {
-            $customerId = $this->customerSession->getCustomerId();
-            $this->paymentProfileCollection
-                ->addFieldToFilter('customer_id', $customerId)
-                ->addFieldToFilter('cc_type', ['neq' => '']);
-            foreach ($this->paymentProfileCollection as $profile) {
-                $profiles[] = [
-                    'id'          => $profile->getId(),
-                    'card_number' => (string)$profile->getCcLast4(),
-                    'card_type'   => (string)$profile->getCcType()
-                ];
-            }
+        $savedCards = [];
+
+        if (!$this->customerSession->isLoggedIn()) {
+            return $savedCards;
         }
-        return $profiles;
+
+        $customerId = $this->customerSession->getCustomerId();
+        $creditCardCollection = $this->creditCardCollectionFactory->create()
+            ->addFieldToFilter('customer_id', $customerId);
+
+        foreach ($creditCardCollection as $creditCard) {
+            $savedCards[] = [
+                'id' => $creditCard->getId(),
+                'card_number' => $creditCard->getData('cc_last_4'),
+                'card_type' => $creditCard->getData('cc_type')
+            ];
+        }
+
+        return $savedCards;
     }
 
     /**
-     * Get credit card images
+     * Get icons for available payment methods
      *
      * @return array
      */
-    protected function getCreditCardImages(): array
+    public function getIcons()
     {
-        $images  = [];
-        $options = $this->creditCardTypeSource->toOptionArray();
-        foreach ($options as $option) {
-            $images[] = [
-                'code'  => $option['code'],
-                'label' => $option['label'],
-                'value' => $option['value']
-            ];
+        if (!empty($this->icons)) {
+            return $this->icons;
         }
-        return $images;
+
+        $types = $this->getCcAvailableTypes(self::CODE);
+        foreach ($types as $code => $label) {
+            if (!array_key_exists($code, $this->icons)) {
+                $asset = $this->ccConfig->createAsset('Vindi_VP::images/cc/' . strtolower($code) . '.png');
+                $placeholder = $this->assetSource->findSource($asset);
+                if ($placeholder) {
+                    list($width, $height) = getimagesize($asset->getSourceFile());
+                    $this->icons[$code] = [
+                        'url' => $asset->getUrl(),
+                        'width' => $width,
+                        'height' => $height,
+                        'title' => __($label),
+                    ];
+                }
+            }
+        }
+
+        return $this->icons;
     }
 }
