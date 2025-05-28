@@ -140,12 +140,58 @@ define(
                 self.installmentsDisabled(true);
                 this.updateInstallmentsValues();
 
-                // Add event listener for card_amount input
-                $(document).on('blur', '#card_amount', function() {
-                    alert("Ola mundo");
+                // Handle card amount change
+                $(document).on('change', '#card_amount', function() {
+                    var grandTotal = self.getGrandTotal();
+                    var cardAmount = parseFloat($(this).val() || 0);
+
+                    if (cardAmount > 0) {
+                        var remainingAmount = grandTotal - cardAmount;
+                        $('#pix_amount').val(remainingAmount.toFixed(2)).prop('disabled', true);
+                    }
+                });
+
+                // Handle when card amount is cleared
+                $(document).on('input', '#card_amount', function() {
+                    if (!$(this).val() || $(this).val() === '') {
+                        $('#pix_amount').val('').prop('disabled', false);
+                    }
+                });
+
+                // Handle pix amount change
+                $(document).on('change', '#pix_amount', function() {
+                    var grandTotal = self.getGrandTotal();
+                    var pixAmount = parseFloat($(this).val() || 0);
+
+                    if (pixAmount > 0) {
+                        var remainingAmount = grandTotal - pixAmount;
+                        $('#card_amount').val(remainingAmount.toFixed(2)).prop('disabled', true);
+                    }
+                });
+
+                // Handle when pix amount is cleared
+                $(document).on('input', '#pix_amount', function() {
+                    if (!$(this).val() || $(this).val() === '') {
+                        $('#card_amount').val('').prop('disabled', false);
+                    }
                 });
 
                 return this;
+            },
+
+            /**
+             * Get grand total from checkout config
+             * @returns {number}
+             */
+            getGrandTotal: function() {
+                var grandTotal = 0;
+                if (window.checkoutConfig &&
+                    window.checkoutConfig.payment &&
+                    window.checkoutConfig.payment.vindi_vp_cardpix &&
+                    window.checkoutConfig.payment.vindi_vp_cardpix.grand_total) {
+                    grandTotal = parseFloat(window.checkoutConfig.payment.vindi_vp_cardpix.grand_total);
+                }
+                return grandTotal;
             },
 
             getCode: function () {
