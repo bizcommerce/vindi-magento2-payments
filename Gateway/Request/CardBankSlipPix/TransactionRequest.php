@@ -1,0 +1,104 @@
+<?php
+namespace Vindi\VP\Gateway\Request\CardBankSlipPix;
+
+use Magento\Payment\Gateway\Request\BuilderInterface;
+use Vindi\VP\Model\Ui\CreditCard\ConfigProvider as CreditCardConfigProvider;
+use Vindi\VP\Model\Ui\BankslipPix\ConfigProvider as BankslipPixConfigProvider;
+use Vindi\VP\Helper\Data as HelperData;
+
+/**
+ * Builds multi-method payment request for Card + Bankslip+Pix transactions.
+ */
+class TransactionRequest implements BuilderInterface
+{
+    /**
+     * @var HelperData
+     */
+    private $helperData;
+
+    /**
+     * Constructor
+     *
+     * @param HelperData $helperData
+     */
+    public function __construct(
+        HelperData $helperData
+    ) {
+        $this->helperData = $helperData;
+    }
+
+    /**
+     * Builds the request payloads for Card + Bankslip+Pix split.
+     *
+     * @param array $buildSubject
+     * @return array
+     * @throws \InvalidArgumentException
+     */
+    public function build(array $buildSubject)
+    {
+        if (!isset($buildSubject['payment'])) {
+            throw new \InvalidArgumentException('Payment data object should be provided');
+        }
+
+        $payment       = $buildSubject['payment']->getPayment();
+        $order         = $payment->getOrder();
+
+        // Retrieve split amounts
+        $amountCredit      = $payment->getAdditionalInformation('amount_credit');
+        $amountBankslipPix = $payment->getAdditionalInformation('amount_bankslip_pix');
+        $installments      = $payment->getAdditionalInformation('installments');
+
+        // Prepare line items from order
+        $items = [];
+        foreach ($order->getAllVisibleItems() as $item) {
+            $items[] = [
+                'product_id'  => $item->getProductId(),
+                'quantity'    => (int)$item->getQtyOrdered(),
+                'unit_price'  => (int)round($item->getPrice() * 100),
+                'description' => $item->getName(),
+            ];
+        }
+
+        // Discount item product ID
+        $discountProductId = $this->helperData->getMultiPaymentDiscountProductId();
+
+        // Discount items to adjust split values
+        $discountItemCredit = [
+            'product_id'  => $discountProductId,
+            'quantity'    => 1,
+            'unit_price'  => -(int)round($amountBankslipPix * 100),
+            'description' => 'Discount Bankslip/Pix',
+        ];
+
+        $discountItemBankslipPix = [
+            'product_id'  => $discountProductId,
+            'quantity'    => 1,
+            'unit_price'  => -(int)round($amountCredit * 100),
+            'description' => 'Discount Card',
+        ];
+
+        $incrementId = $order->getIncrementId();
+
+        // Build card transaction payload
+        $payloadCard = [
+            'customer_id'         => $order->getCustomerId(),
+            'payment_method_code' => CreditCardConfigProvider::CODE,
+            'bill_items'          => array_merge($items, [$discountItemCredit]),
+            'installments'        => (int)$installments,
+            'code'                => $incrementId . '-01',
+        ];
+
+        // Build Bankslip+Pix transaction payload
+        $payloadBankslipPix = [
+            'customer_id'         => $order->getCustomerId(),
+            'payment_method_code' => BankslipPixConfigProvider::CODE,
+            'bill_items'          => array_merge($items, [$discountItemBankslipPix]),
+            'code'                => $incrementId . '-02',
+        ];
+
+        return [
+            'card'         => $payloadCard,
+            'bankslip_pix' => $payloadBankslipPix
+        ];
+    }
+}
