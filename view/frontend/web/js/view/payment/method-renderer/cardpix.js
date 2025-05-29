@@ -74,7 +74,11 @@ define(
                 paymentProfiles: [],
                 selectedPaymentProfile: '',
                 installmentsDisabled: ko.observable(true),
-                saveCard: false
+                saveCard: false,
+                showCardError: ko.observable(false),
+                showPixError: ko.observable(false),
+                cardErrorMessage: ko.observable(''),
+                pixErrorMessage: ko.observable('')
             },
 
             /** @inheritdoc */
@@ -94,7 +98,11 @@ define(
                     'creditCardOwner',
                     'creditCardInstallments',
                     'selectedPaymentProfile',
-                    'saveCard'
+                    'saveCard',
+                    'showCardError',
+                    'showPixError',
+                    'cardErrorMessage',
+                    'pixErrorMessage'
                 ]);
 
                 this.creditCardVerificationNumber('');
@@ -145,9 +153,24 @@ define(
                     var grandTotal = self.getGrandTotal();
                     var cardAmount = parseFloat($(this).val() || 0);
 
+                    self.showCardError(false);
+                    self.cardErrorMessage('');
+                    $(this).removeClass('error');
+
+                    // Validate if the amount is greater than the total
+                    if (cardAmount > grandTotal) {
+                        self.showCardError(true);
+                        self.cardErrorMessage($t('O valor excede o valor total do pedido.'));
+                        $(this).addClass('error');
+                        return;
+                    }
+
                     if (cardAmount > 0) {
                         var remainingAmount = grandTotal - cardAmount;
                         $('#pix_amount').val(remainingAmount.toFixed(2)).prop('disabled', true);
+                        self.showPixError(false);
+                        self.pixErrorMessage('');
+                        $('#pix_amount').removeClass('error');
                     }
                 });
 
@@ -155,6 +178,10 @@ define(
                 $(document).on('input', '#card_amount', function() {
                     if (!$(this).val() || $(this).val() === '') {
                         $('#pix_amount').val('').prop('disabled', false);
+                        self.showCardError(false);
+                        self.cardErrorMessage('');
+                        $(this).removeClass('error');
+                        $('#pix_amount').removeClass('error');
                     }
                 });
 
@@ -163,9 +190,24 @@ define(
                     var grandTotal = self.getGrandTotal();
                     var pixAmount = parseFloat($(this).val() || 0);
 
+                    self.showPixError(false);
+                    self.pixErrorMessage('');
+                    $(this).removeClass('error');
+
+                    // Validate if the amount is greater than the total
+                    if (pixAmount > grandTotal) {
+                        self.showPixError(true);
+                        self.pixErrorMessage($t('The amount exceeds the total order value.'));
+                        $(this).addClass('error');
+                        return;
+                    }
+
                     if (pixAmount > 0) {
                         var remainingAmount = grandTotal - pixAmount;
                         $('#card_amount').val(remainingAmount.toFixed(2)).prop('disabled', true);
+                        self.showCardError(false);
+                        self.cardErrorMessage('');
+                        $('#card_amount').removeClass('error');
                     }
                 });
 
@@ -173,10 +215,25 @@ define(
                 $(document).on('input', '#pix_amount', function() {
                     if (!$(this).val() || $(this).val() === '') {
                         $('#card_amount').val('').prop('disabled', false);
+                        self.showPixError(false);
+                        self.pixErrorMessage('');
+                        $(this).removeClass('error');
+                        $('#card_amount').removeClass('error');
                     }
                 });
 
                 return this;
+            },
+
+            /**
+             * Get validation for VAT field
+             * @returns {Object}
+             */
+            getVatValidation: function() {
+                return {
+                    'required-entry': true,
+                    'validate-taxvat': true
+                };
             },
 
             /**

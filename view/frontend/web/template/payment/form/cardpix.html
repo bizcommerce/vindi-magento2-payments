@@ -63,6 +63,10 @@
                                 data-bind="enable: isActive($parents)"
                             />
                         </div>
+                        <!-- Error message for card amount -->
+                        <div class="field-error" data-bind="visible: showCardError">
+                            <span data-bind="text: cardErrorMessage"></span>
+                        </div>
                     </div>
 
                     <!-- existing credit‐card fields -->
@@ -245,6 +249,10 @@
                                 class="input-text-vindi"
                                 data-bind="enable: isActive($parents)" />
                         </div>
+                        <!-- Error message for pix amount -->
+                        <div class="field-error" data-bind="visible: showPixError">
+                            <span data-bind="text: pixErrorMessage"></span>
+                        </div>
                     </div>
                     <div class="field">
                         <div class="control">
@@ -260,8 +268,11 @@
                                 class="input-text-vindi cpf-cnpj"
                                 maxlength="14"
                                 data-bind="attr: {
-                                    placeholder: $t('CPF/CNPJ'),
-                                    'data-validate': JSON.stringify({'required':true})
+                                    title: $t('CPF'),
+                                    placeholder: $t('CPF'),
+                                    id: getCode() + '_taxvat',
+                                    'data-container': getCode() + '-taxvat',
+                                    'data-validate': getVatValidation()
                                 },
                                 enable: isActive($parents),
                                 value: taxvat,
