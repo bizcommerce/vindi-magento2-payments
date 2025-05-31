@@ -171,6 +171,9 @@ define(
                         self.showPixError(false);
                         self.pixErrorMessage('');
                         $('#pix_amount').removeClass('error');
+
+                        // Update installments when card amount changes
+                        self.updateInstallmentsValues();
                     }
                 });
 
@@ -182,6 +185,8 @@ define(
                         self.cardErrorMessage('');
                         $(this).removeClass('error');
                         $('#pix_amount').removeClass('error');
+                        // Update installments when card amount is cleared
+                        self.updateInstallmentsValues();
                     }
                 });
 
@@ -208,6 +213,9 @@ define(
                         self.showCardError(false);
                         self.cardErrorMessage('');
                         $('#card_amount').removeClass('error');
+
+                        // Update installments when pix amount changes (affecting card amount)
+                        self.updateInstallmentsValues();
                     }
                 });
 
@@ -219,6 +227,8 @@ define(
                         self.pixErrorMessage('');
                         $(this).removeClass('error');
                         $('#card_amount').removeClass('error');
+                        // Update installments when pix amount is cleared
+                        self.updateInstallmentsValues();
                     }
                 });
 
@@ -400,13 +410,20 @@ define(
                         self.installmentsDisabled(false);
                         return;
                     }
+
+                    // Get card amount value from form
+                    var cardAmount = parseFloat($('#card_amount').val() || 0);
+
                     fetch(url, {
                         method: 'POST',
                         cache: 'no-cache',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({
                             form_key: window.checkoutConfig.formKey,
-                            cc_type: self.mapCardType(self.creditCardType())
+                            cc_type: self.mapCardType(self.creditCardType()),
+                            payment_link: {
+                                grand_total: cardAmount
+                            }
                         })
                     }).then(function (response) {
                         self.installments.removeAll();
