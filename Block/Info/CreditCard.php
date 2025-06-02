@@ -50,29 +50,44 @@ class CreditCard extends AbstractInfo
     }
 
     /**
+     * Prepare specific information to display on payment info block
+     *
      * @param \Magento\Framework\DataObject|array|null $transport
      * @return \Magento\Framework\DataObject
      * @throws \Magento\Framework\Exception\LocalizedException
      */
     protected function _prepareSpecificInformation($transport = null)
     {
-        $installments = $this->getInfo()->getAdditionalInformation('installments') ??
-            (int) $this->getInfo()->getAdditionalInformation('additional_data')['installments'] ;
+        $info = $this->getInfo();
+        $additionalData = $info->getAdditionalInformation('additional_data');
+
+        $installments = $info->getAdditionalInformation('installments')
+            ?? (is_array($additionalData) && isset($additionalData['installments'])
+                ? (int) $additionalData['installments']
+                : 1);
+
+        $status = $info->getAdditionalInformation('status_name')
+            ?? (is_array($additionalData) && isset($additionalData['status_name'])
+                ? $additionalData['status_name']
+                : __('N/A'));
 
         /** @var \Magento\Sales\Model\Order $order */
-        $order = $this->getInfo()->getOrder();
-        $installmentValue = $order->getGrandTotal() / $installments;
+        $order = $info->getOrder();
+        $installmentValue = $order->getGrandTotal() / max($installments, 1);
 
         $body = [
-            (string)__('Credit Card Type') => $this->getCcTypeName(),
-            (string)__('Credit Card Owner') => $this->getInfo()->getCcOwner(),
-            (string)__('Card Number') => sprintf('xxxx-%s', $this->getInfo()->getCcLast4()),
-            (string)__('Installments') => sprintf('%s x of %s', $installments, $this->priceCurrency->format($installmentValue, false))
+            (string) __('Credit Card Type') => $this->getCcTypeName(),
+            (string) __('Credit Card Owner') => $info->getCcOwner(),
+            (string) __('Card Number') => sprintf('xxxx-%s', $info->getCcLast4()),
+            (string) __('Installments') => sprintf(
+                '%s x of %s',
+                $installments,
+                $this->priceCurrency->format($installmentValue, false)
+            ),
+            (string) __('Status') => $status,
         ];
 
-        $transport = new DataObject($body);
-
-        return parent::_prepareSpecificInformation($transport);
+        return new \Magento\Framework\DataObject($body);
     }
 
     /**
