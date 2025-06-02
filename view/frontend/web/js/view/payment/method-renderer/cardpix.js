@@ -78,7 +78,9 @@ define(
                 showCardError: ko.observable(false),
                 showPixError: ko.observable(false),
                 cardErrorMessage: ko.observable(''),
-                pixErrorMessage: ko.observable('')
+                pixErrorMessage: ko.observable(''),
+                isFormValid: ko.observable(true),
+                isLoadingInstallments: ko.observable(false)
             },
 
             /** @inheritdoc */
@@ -102,7 +104,9 @@ define(
                     'showCardError',
                     'showPixError',
                     'cardErrorMessage',
-                    'pixErrorMessage'
+                    'pixErrorMessage',
+                    'isFormValid',
+                    'isLoadingInstallments'
                 ]);
 
                 this.creditCardVerificationNumber('');
@@ -136,7 +140,7 @@ define(
                     if (value) {
                         var cardProfiles = self.getPaymentProfiles();
                         var selectedCard = cardProfiles.find(function (card) {
-                            return card.value == value;
+                            return card.value === value;
                         });
                         if (selectedCard && selectedCard.card_type) {
                             self.creditCardType(selectedCard.card_type);
@@ -145,6 +149,8 @@ define(
                     self.updateInstallmentsValues();
                 });
 
+                // Inicializa e adiciona o loader
+                self.initializeLoader();
                 self.installmentsDisabled(true);
                 this.updateInstallmentsValues();
 
@@ -156,12 +162,14 @@ define(
                     self.showCardError(false);
                     self.cardErrorMessage('');
                     $(this).removeClass('error');
+                    self.isFormValid(true);
 
                     // Validate if the amount is greater than the total
                     if (cardAmount > grandTotal) {
                         self.showCardError(true);
                         self.cardErrorMessage($t('O valor excede o valor total do pedido.'));
                         $(this).addClass('error');
+                        self.isFormValid(false);
                         return;
                     }
 
@@ -185,6 +193,7 @@ define(
                         self.cardErrorMessage('');
                         $(this).removeClass('error');
                         $('#pix_amount').removeClass('error');
+                        self.isFormValid(true);
                         // Update installments when card amount is cleared
                         self.updateInstallmentsValues();
                     }
@@ -198,12 +207,14 @@ define(
                     self.showPixError(false);
                     self.pixErrorMessage('');
                     $(this).removeClass('error');
+                    self.isFormValid(true);
 
                     // Validate if the amount is greater than the total
                     if (pixAmount > grandTotal) {
                         self.showPixError(true);
-                        self.pixErrorMessage($t('The amount exceeds the total order value.'));
+                        self.pixErrorMessage($t('O valor excede o valor total do pedido.'));
                         $(this).addClass('error');
+                        self.isFormValid(false);
                         return;
                     }
 
@@ -227,6 +238,7 @@ define(
                         self.pixErrorMessage('');
                         $(this).removeClass('error');
                         $('#card_amount').removeClass('error');
+                        self.isFormValid(true);
                         // Update installments when pix amount is cleared
                         self.updateInstallmentsValues();
                     }
@@ -236,14 +248,79 @@ define(
             },
 
             /**
+             * Initialize loader for installments
+             */
+            initializeLoader: function() {
+                var self = this;
+
+                // Add CSS for loader
+                var style = document.createElement('style');
+                style.type = 'text/css';
+                style.innerHTML = `
+                    .vindi-loader-container {
+                        display: flex;
+                        align-items: center;
+                        margin-top: 5px;
+                    }
+                    .vindi-loader {
+                        border: 3px solid #f3f3f3;
+                        border-top: 3px solid #555;
+                        border-radius: 50%;
+                        width: 20px;
+                        height: 20px;
+                        animation: vindi-spin 1s linear infinite;
+                        margin-right: 10px;
+                    }
+                    .vindi-loader-text {
+                        font-size: 14px;
+                        color: #555;
+                    }
+                    @keyframes vindi-spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                `;
+                document.head.appendChild(style);
+
+                // Create loader HTML
+                var loaderHtml = `
+                    <div class="vindi-loader-container" style="display: none;">
+                        <div class="vindi-loader"></div>
+                        <div class="vindi-loader-text">${$t('Carregando parcelas...')}</div>
+                    </div>
+                `;
+
+                // Add loader after installments select
+                this.isLoadingInstallments.subscribe(function(isLoading) {
+                    setTimeout(function() {
+                        var $installmentField = $('.field.installments.required');
+                        var $loaderContainer = $installmentField.find('.vindi-loader-container');
+
+                        if ($loaderContainer.length === 0 && $installmentField.length > 0) {
+                            $installmentField.find('.control').append(loaderHtml);
+                            $loaderContainer = $installmentField.find('.vindi-loader-container');
+                        }
+
+                        if ($loaderContainer.length > 0) {
+                            if (isLoading) {
+                                $loaderContainer.show();
+                            } else {
+                                $loaderContainer.hide();
+                            }
+                        }
+                    }, 0);
+                });
+            },
+
+            /**
              * Get validation for VAT field
              * @returns {Object}
              */
             getVatValidation: function() {
-                return {
+                return JSON.stringify({
                     'required-entry': true,
                     'validate-taxvat': true
-                };
+                });
             },
 
             /**
@@ -342,8 +419,152 @@ define(
              * @returns {boolean}
              */
             validate: function () {
-                var $form = $('#' + 'form_' + this.getCode());
-                return ($form && $form.validation() && $form.validation('isValid'));
+                var self = this;
+
+                try {
+                    var $form = $('#' + 'form_' + this.getCode());
+
+                    // Validate card and pix amounts
+                    var cardAmount = parseFloat($('#card_amount').val() || 0);
+                    var pixAmount = parseFloat($('#pix_amount').val() || 0);
+                    var grandTotal = this.getGrandTotal();
+
+                    // Reset error states
+                    this.showCardError(false);
+                    this.showPixError(false);
+                    $('#card_amount').removeClass('error');
+                    $('#pix_amount').removeClass('error');
+                    this.isFormValid(true);
+
+                    // Validate card amount
+                    if (cardAmount > grandTotal) {
+                        this.showCardError(true);
+                        this.cardErrorMessage($t('O valor excede o valor total do pedido.'));
+                        $('#card_amount').addClass('error');
+                        this.isFormValid(false);
+                        return false;
+                    }
+
+                    // Validate pix amount
+                    if (pixAmount > grandTotal) {
+                        this.showPixError(true);
+                        this.pixErrorMessage($t('O valor excede o valor total do pedido.'));
+                        $('#pix_amount').addClass('error');
+                        this.isFormValid(false);
+                        return false;
+                    }
+
+                    // Validate total of both payment methods with tolerance for floating point errors
+                    var totalAmount = Math.round((cardAmount + pixAmount) * 100) / 100;
+                    var roundedGrandTotal = Math.round(grandTotal * 100) / 100;
+
+                    if (totalAmount > roundedGrandTotal + 0.01) { // Adding small tolerance (0.01)
+                        this.showCardError(true);
+                        this.cardErrorMessage($t('A soma dos valores excede o total do pedido.'));
+                        $('#card_amount').addClass('error');
+                        this.isFormValid(false);
+                        return false;
+                    }
+
+                    // Validate if at least one payment method is selected
+                    if (totalAmount === 0 || isNaN(totalAmount)) {
+                        this.showCardError(true);
+                        this.cardErrorMessage($t('Informe um valor para pelo menos um método de pagamento.'));
+                        $('#card_amount').addClass('error');
+                        this.isFormValid(false);
+                        return false;
+                    }
+
+                    // Handle manual form validation instead of using jQuery validation plugin
+                    if ($form && $form.length) {
+                        var isValid = true;
+
+                        // Validate required fields
+                        $form.find('input[data-validate], select[data-validate]').each(function() {
+                            var $field = $(this);
+
+                            // Skip validation for fields in hidden sections
+                            if ($field.is(':hidden') || $field.closest('.field').is(':hidden')) {
+                                return;
+                            }
+
+                            // Skip validation for payment profile when selected
+                            if (self.selectedPaymentProfile() && ($field.attr('id') === (self.getCode() + '_cc_number') ||
+                                $field.attr('id') === (self.getCode() + '_cc_owner') ||
+                                $field.attr('id') === (self.getCode() + '_cc_exp_date') ||
+                                $field.attr('id') === (self.getCode() + '_cc_cid'))) {
+                                return;
+                            }
+
+                            // Skip validation for fields when card amount is 0
+                            if (cardAmount === 0 && ($field.attr('id') === (self.getCode() + '_cc_installments') ||
+                                $field.attr('id') === (self.getCode() + '_cc_number') ||
+                                $field.attr('id') === (self.getCode() + '_cc_owner') ||
+                                $field.attr('id') === (self.getCode() + '_cc_exp_date') ||
+                                $field.attr('id') === (self.getCode() + '_cc_cid'))) {
+                                return;
+                            }
+
+                            // Skip validation for taxvat when pix amount is 0
+                            if (pixAmount === 0 && $field.attr('id') === (self.getCode() + '_taxvat')) {
+                                return;
+                            }
+
+                            if ($field.val() === '') {
+                                isValid = false;
+                                $field.addClass('mage-error');
+                            } else {
+                                $field.removeClass('mage-error');
+                            }
+                        });
+
+                        if (!isValid) {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                } catch (e) {
+                    console.error('Erro durante validação:', e);
+                    return true; // Em caso de erro na validação, permite continuar
+                }
+            },
+
+            /**
+             * Override placeOrder to add custom validation
+             */
+            placeOrder: function (data, event) {
+                if (event) {
+                    event.preventDefault();
+                }
+
+                try {
+                    if (this.validate()) {
+                        this.isPlaceOrderActionAllowed(false);
+
+                        this.getPlaceOrderDeferredObject()
+                            .done(
+                                function () {
+                                    self.afterPlaceOrder();
+
+                                    if (self.redirectAfterPlaceOrder) {
+                                        redirectOnSuccessAction.execute();
+                                    }
+                                }
+                            ).always(
+                            function () {
+                                self.isPlaceOrderActionAllowed(true);
+                            }
+                        );
+
+                        return true;
+                    }
+                } catch (e) {
+                    console.error('Erro ao processar pedido:', e);
+                    this.isPlaceOrderActionAllowed(true);
+                }
+
+                return false;
             },
 
             /**
@@ -358,7 +579,7 @@ define(
                     window.checkoutConfig.payment.ccform.urls[this.getCode()] &&
                     window.checkoutConfig.payment.ccform.urls[this.getCode()].retrieve_installments
                         ? window.checkoutConfig.payment.ccform.urls[this.getCode()].retrieve_installments
-                        : "";
+                        : '';
                 } catch (e) {
                     // eslint-disable-next-line no-console
                     console.log('Installments URL not defined');
@@ -400,6 +621,9 @@ define(
                 var self = this;
                 self.installmentsDisabled(true);
 
+                // Mostrar o loader
+                self.isLoadingInstallments(true);
+
                 if (self.debounceTimer !== null) {
                     clearTimeout(self.debounceTimer);
                 }
@@ -408,6 +632,7 @@ define(
                     var url = self.retrieveInstallmentsUrl();
                     if (!url || typeof fetch !== "function") {
                         self.installmentsDisabled(false);
+                        self.isLoadingInstallments(false);
                         return;
                     }
 
@@ -416,31 +641,25 @@ define(
 
                     fetch(url, {
                         method: 'POST',
-                        cache: 'no-cache',
-                        headers: {'Content-Type': 'application/json'},
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
                         body: JSON.stringify({
-                            form_key: window.checkoutConfig.formKey,
-                            cc_type: self.mapCardType(self.creditCardType()),
+                            cc_type: self.creditCardType(),
                             payment_link: {
                                 grand_total: cardAmount
                             }
                         })
                     }).then(function (response) {
-                        self.installments.removeAll();
                         return response.json();
                     }).then(function (json) {
-                        if (json && Array.isArray(json)) {
-                            json.forEach(function (installment) {
-                                self.installments.push(installment);
-                                self.hasInstallments(true);
-                            });
-                            if (json.length > 0) {
-                                self.creditCardInstallments(json[0].installments);
-                            }
-                        }
+                        self.installments(json);
+                        self.hasInstallments(json.length > 0);
                         self.installmentsDisabled(false);
+                        self.isLoadingInstallments(false);
                     }).catch(function () {
                         self.installmentsDisabled(false);
+                        self.isLoadingInstallments(false);
                     });
                 }, 500);
             },
