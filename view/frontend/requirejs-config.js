@@ -7,5 +7,10 @@ var config = {
     },
     shim: {
         'vindi-cc-mask': {}
+    },
+    map: {
+        '*': {
+            'Vindi_VP/payment/form/cardbankslippix': 'Vindi_VP/template/payment/cardbankslippix'
+        }
     }
 };

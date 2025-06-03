@@ -1,215 +1,315 @@
 <!--
-  Card + BoletoPix payment template
-  @category Vindi
-  @package Vindi_VP
+/**
+ * Vindi
+ *
+ * NOTICE OF LICENSE
+ *
+ * This source file is subject to the Vindi license that is
+ * available through the world-wide-web at this URL:
+ *
+ * DISCLAIMER
+ *
+ * Do not edit or add to this file if you wish to upgrade this extension to a newer
+ * version in the future.
+ *
+ * @category    Vindi
+ * @package     Vindi_VP
+ * @copyright   Copyright (c) Vindi
+ */
 -->
-<div class="payment-method" data-bind="css:{'_active':getCode()==isChecked()}">
-    <div class="payment-method-title field choice">
-        <input type="radio" name="payment[method]" class="radio"
-               data-bind="attr:{id:getCode()}, value:getCode(), checked:isChecked, click:selectPaymentMethod, visible:isRadioButtonVisible()"/>
-        <label data-bind="attr:{for:getCode()}" class="label">
-            <span data-bind="text:getTitle()"></span>
-        </label>
-    </div>
-    <div class="payment-method-content" data-bind="visible:isChecked()">
-        <!-- messages -->
-        <!-- ko foreach:getRegion('messages') -->
-        <!-- ko template:getTemplate() --><!-- /ko -->
-        <!-- /ko -->
-        <div class="payment-method-billing-address">
-            <!-- ko foreach:$parent.getRegion(getBillingAddressFormName()) -->
-            <!-- ko template:getTemplate() --><!-- /ko -->
-            <!-- /ko -->
+<div class="payment-method" data-bind="css: {'_active': getCode() === isChecked()}">
+    <div class="payment-method-box">
+        <div class="payment-method-title field choice">
+            <input
+                type="radio"
+                name="payment[method]"
+                class="input input-radio"
+                data-bind="
+                    attr: {id: getCode()},
+                    value: getCode(),
+                    checked: isChecked,
+                    click: selectPaymentMethod,
+                    visible: isRadioButtonVisible()
+                " />
+            <label class="label" data-bind="attr: {for: getCode()}">
+                <span data-bind="text: getTitle()"></span>
+            </label>
         </div>
 
-        <!-- Credit Card Section -->
-        <div class="cc-payment-section">
-            <h3 data-bind="i18n:'Credit Card Payment'"></h3>
-            <div class="field amount required" style="max-width:500px;">
-                <label class="label"><span data-bind="i18n:'Amount with Credit Card:'"></span></label>
-                <div class="control">
-                    <input type="number" class="input-text"
-                           data-bind="value:creditAmountDisplay, enable:isCreditEditable,
-                            attr:{placeholder:$t('0.00')},
-                            css:{'error-border':creditInvalid()}"/>
-                    <!-- ko if:creditInvalid -->
-                    <div class="error-message"
-                         data-bind="text:$t('Credit amount cannot exceed order total of ') + formattedOrderTotal()"></div>
-                    <!-- /ko -->
-                </div>
-            </div>
-            <form class="form container-vindi">
-                <fieldset data-bind="attr:{class:'fieldset payment items ccard '+getCode(),
-                                 id:'payment_form_'+getCode()}" style="max-width:500px;">
-                    <legend class="legend"><span data-bind="i18n:'Card Information'"></span></legend><br/>
-                    <!-- saved profiles -->
-                    <!-- ko if:hasPaymentProfiles() -->
+        <div data-bind="attr: {class: 'payment-method-content container-' + getCode()}">
+            <form data-bind="attr: {id: 'form_' + getCode()}">
+                <fieldset
+                    data-bind="
+                        attr: {
+                            class: 'fieldset payment items ccard ' + getCode(),
+                            id: 'payment_form_' + getCode()
+                        },
+                        visible: showCardData
+                    ">
+
+                    <!--=== Pagamento com Cartão de Crédito ===-->
                     <div class="field number required">
-                        <label data-bind="attr:{for:getCode()+'_cc_payment_profile'}" class="label">
-                            <span data-bind="i18n:'Your saved cards'"></span>
+                        <h3 data-bind="i18n: 'Pagamento com Cartão de Crédito'"></h3>
+                        <label class="label" for="bankslippix_card_amount">
+                            <span>Valor a pagar com Cartão de Crédito:</span>
                         </label>
                         <div class="control">
-                            <select name="payment[payment_profile]" class="input-text select"
-                                    data-bind="attr:{
-                        id:getCode()+'_cc_payment_profile',
-                        'data-validate':JSON.stringify({
-                          'required-number':true,
-                          'validate-card-type':getCcAvailableTypesValues(),
-                          'validate-card-number':'#'+getCode()+'_cc_type',
-                          'validate-cc-type':'#'+getCode()+'_cc_type'
-                        })
-                      },
-                      enable:isActive($parents),
-                      options:getPaymentProfiles(),
-                      optionsValue:'value',
-                      optionsText:'text',
-                      optionsCaption:$t('New Card'),
-                      value:selectedPaymentProfile"></select>
+                            <input
+                                type="text"
+                                name="payment[card_amount]"
+                                id="bankslippix_card_amount"
+                                placeholder="0,00"
+                                class="input-text-vindi"
+                                data-bind="enable: isActive($parents)"
+                            />
+                        </div>
+                        <!-- Error message for card amount -->
+                        <div class="field-error" data-bind="visible: showCardError">
+                            <span data-bind="text: cardErrorMessage"></span>
+                        </div>
+                    </div>
+
+                    <!-- existing credit‐card fields -->
+                    <!-- ko if: hasPaymentProfiles() -->
+                    <div class="field number required">
+                        <label class="label" data-bind="attr: {for: getCode() + '_cc_payment_profile'}">
+                            <span data-bind="i18n: 'Seus cartões salvos'"></span>
+                        </label>
+                        <div class="control">
+                            <select
+                                name="payment[payment_profile]"
+                                class="input-text select"
+                                data-bind="
+                                    attr: {id: getCode() + '_cc_payment_profile'},
+                                    enable: isActive($parents),
+                                    options: getPaymentProfiles(),
+                                    optionsValue: 'value',
+                                    optionsText: 'text',
+                                    optionsCaption: $t('Novo Cartão'),
+                                    value: selectedPaymentProfile,
+                                    valueUpdate: 'change'
+                                ">
+                            </select>
                         </div>
                     </div>
                     <!-- /ko -->
 
-                    <!-- card inputs -->
-                    <div class="field number cc-number required vindi-cc-number-container"
-                         data-bind="visible:!selectedPaymentProfile()">
+                    <div class="field number cc-number required vindi-cc-number-container" data-bind="visible: !selectedPaymentProfile()">
                         <div class="credit-card-types-container">
                             <ul class="credit-card-types">
-                                <!-- ko foreach:{data:getCcAvailableTypesValues(),as:'item'} -->
-                                <li class="item"
-                                    data-bind="css:{
-                      _active:$parent.selectedCardType()==item.value,
-                      _inactive:$parent.selectedCardType()!=null &&
-                                $parent.selectedCardType()!=item.value
-                    }">
-                                    <!-- ko if:$parent.getIcons(item.value) -->
-                                    <img data-bind="attr:{
-                    src:$parent.getIcons(item.value).url,
-                    alt:item.type,
-                    width:$parent.getIcons(item.value).width,
-                    height:$parent.getIcons(item.value).height
-                  }"/>
+                                <!-- ko foreach: { data: getCcAvailableTypesValues(), as: 'item' } -->
+                                <li class="item" data-bind="
+                                    css: {
+                                        _active: $parent.selectedCardType() == item.value,
+                                        _inactive: $parent.selectedCardType() != null && $parent.selectedCardType() != item.value
+                                    }
+                                ">
+                                    <!-- ko if: $parent.getIcons(item.value) -->
+                                    <img data-bind="attr: {
+                                        src: $parent.getIcons(item.value).url,
+                                        alt: item.type,
+                                        width: $parent.getIcons(item.value).width,
+                                        height: $parent.getIcons(item.value).height
+                                    }" />
                                     <!-- /ko -->
                                 </li>
                                 <!-- /ko -->
                             </ul>
-                            <input type="hidden" name="payment[cc_type]" class="input-text-vindi"
-                                   data-bind="attr:{
-                       id:getCode()+'_cc_type',
-                       'data-container':getCode()+'-cc-type'
-                     }, value:creditCardType"/>
                         </div>
                         <div class="control">
-                            <input name="payment[cc_number]" type="number" class="input-text-vindi"
-                                   data-bind="attr:{
-                       autocomplete:'off',
-                       id:getCode()+'_cc_number',
-                       placeholder:$t('Card Number'),
-                       'data-validate':JSON.stringify({
-                         'required-number':true,
-                         'validate-vindi-card-number':'#'+getCode()+'_cc_number'
-                       })
-                     },
-                     enable:isActive($parents),
-                     value:vindiCreditCardNumber,
-                     valueUpdate:'keyup'"/>
+                            <input
+                                type="number"
+                                name="payment[cc_number]"
+                                class="input-text-vindi"
+                                data-bind="attr: {
+                                    id: getCode() + '_cc_number',
+                                    placeholder: $t('Número do Cartão'),
+                                    'data-validate': JSON.stringify({'required-number':true})
+                                },
+                                change: updateInstallmentsValues,
+                                enable: isActive($parents),
+                                value: vindiCreditCardNumber,
+                                valueUpdate: 'keyup'"
+                            />
                         </div>
                     </div>
 
-                    <div class="field number required"
-                         data-bind="attr:{id:getCode()+'-cc-owner-container'},
-                          visible:!selectedPaymentProfile()">
+                    <div class="field number required" data-bind="visible: !selectedPaymentProfile()">
+                        <label class="label" data-bind="attr: {for: getCode() + '_cc_owner'}">
+                            <span data-bind="i18n: 'Nome no Cartão'"></span>
+                        </label>
                         <div class="control">
-                            <input type="text" name="payment[cc_owner]" class="input-text-vindi"
-                                   data-bind="attr:{
-                       id:getCode()+'_cc_owner',
-                       placeholder:$t('Name on Card'),
-                       'data-validate':JSON.stringify({'required-number':true})
-                     },
-                     enable:isActive($parents),
-                     value:creditCardOwner,
-                     valueUpdate:'keyup'"/>
+                            <input
+                                type="text"
+                                name="payment[cc_owner]"
+                                class="input-text-vindi"
+                                data-bind="attr: {
+                                    id: getCode() + '_cc_owner',
+                                    placeholder: $t('Nome no Cartão'),
+                                    'data-validate': JSON.stringify({'required':true})
+                                },
+                                enable: isActive($parents),
+                                value: creditCardOwner,
+                                valueUpdate: 'keyup'"
+                            />
                         </div>
                     </div>
 
-                    <div class="field number required vindi-cc-exp-cvv"
-                         data-bind="visible:!selectedPaymentProfile()">
-            <span data-bind="attr:{id:getCode()+'-cc-exp-date-container'}">
-              <input type="text" name="payment[cc_exp_date]" class="input-text-vindi"
-                     pattern="\d{2}\/\d{2}" maxlength="5" inputmode="numeric"
-                     oninput="this.value=this.value
-                       .replace(/\D/g,'')
-                       .replace(/^(\d{2})(\d)/,'$1/$2')
-                       .substr(0,5);"
-                     data-bind="attr:{
-                       id:getCode()+'_cc_exp_date',
-                       placeholder:$t('Expiration Date'),
-                       'data-validate':JSON.stringify({'required-number':true})
-                     },
-                     enable:isActive($parents),
-                     value:creditCardExpDate,
-                     valueUpdate:'keyup'"/>
-            </span>
-                        <!-- ko if:hasVerification() -->
-                        <span data-bind="attr:{id:getCode()+'-cc-cvv'}">
-              <input type="text" name="payment[cc_cvv]" class="input-text-vindi"
-                     maxlength="4" autocomplete="off"
-                     data-bind="attr:{
-                       id:getCode()+'_cc_cid',
-                       placeholder:$t('CVV'),
-                       'data-validate':JSON.stringify({
-                         'required-number':true,
-                         'validate-number':'#'+getCode()+'_cc_type'
-                       })
-                     },
-                     enable:isActive($parents),
-                     value:creditCardVerificationNumber"/>
-            </span>
-                        <!-- /ko -->
+                    <div class="field number required vindi-cc-exp" data-bind="visible: !selectedPaymentProfile()">
+                        <label class="label" data-bind="attr: {for: getCode() + '_cc_exp_date'}">
+                            <span data-bind="i18n: 'Data de Validade'"></span>
+                        </label>
+                        <div class="control">
+                            <input
+                                type="text"
+                                name="payment[cc_exp_date]"
+                                class="input-text-vindi"
+                                pattern="[0-9]*"
+                                inputmode="numeric"
+                                data-bind="attr: {
+                                    id: getCode() + '_cc_exp_date',
+                                    placeholder: $t('MM/AA'),
+                                    'data-validate': JSON.stringify({'required-number':true})
+                                },
+                                enable: isActive($parents),
+                                value: creditCardExpDate,
+                                valueUpdate: 'keyup'"
+                            />
+                        </div>
                     </div>
 
-                    <!-- ko if:installmentsAllowed() -->
-                    <div class="field number required installments"
-                         data-bind="attr:{id:getCode()+'_installments'}">
+                    <div class="field number required" data-bind="visible: !selectedPaymentProfile()">
+                        <label class="label" data-bind="attr: {for: getCode() + '_cc_cid'}">
+                            <span data-bind="i18n: 'CVV'"></span>
+                        </label>
                         <div class="control">
-                            <select name="payment[cc_installments]" class="select credit-card-installments"
-                                    data-bind="attr:{
-                        id:getCode()+'_installments',
-                        'data-validate':JSON.stringify({
-                          required:true,
-                          'validate-cc-exp':'#'+getCode()+'_expiration_yr'
-                        })
-                      },
-                      enable:isActive($parents),
-                      disable:isInstallmentsDisabled,
-                      options:creditCardInstallments,
-                      optionsValue:'value',
-                      optionsText:'text',
-                      optionsCaption:$t('Installments'),
-                      value:selectedInstallments"/>
+                            <input
+                                type="text"
+                                name="payment[cc_cid]"
+                                class="input-text-vindi"
+                                maxlength="4"
+                                data-bind="attr: {
+                                    id: getCode() + '_cc_cid',
+                                    placeholder: $t('CVV'),
+                                    'data-validate': JSON.stringify({'required-number':true})
+                                },
+                                enable: isActive($parents),
+                                value: creditCardVerificationNumber"
+                            />
                         </div>
+                    </div>
+
+                    <div class="field save-card" data-bind="visible: !selectedPaymentProfile()">
+                        <label for="save_card_checkbox" class="label">
+                            <input
+                                type="checkbox"
+                                id="save_card_checkbox"
+                                name="payment[save_card]"
+                                class="input-checkbox"
+                                data-bind="checked: saveCard" />
+                            <span data-bind="i18n: 'Salvar cartão para uso futuro'"></span>
+                        </label>
+                    </div>
+
+                    <div class="field installments required">
+                        <label class="label"><span data-bind="i18n: 'Parcelas'"></span></label>
+                        <div class="control">
+                            <select
+                                name="payment[installments]"
+                                class="select"
+                                data-bind="attr: {
+                                    id: getCode() + '_cc_installments',
+                                    'data-validate': JSON.stringify({required:true})
+                                },
+                                enable: hasInstallments,
+                                disable: installmentsDisabled,
+                                options: installments,
+                                optionsValue: 'installments',
+                                optionsText: 'text',
+                                optionsCaption: $t('Installments'),
+                                value: creditCardInstallments"
+                            ></select>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!--=== Pagamento com Boleto ===-->
+                    <div class="field number required">
+                        <h3 data-bind="i18n: 'Pagamento com Boleto'"></h3>
+                        <label class="label" for="bankslippix_bankslip_amount">
+                            <span>Valor a pagar com Boleto:</span>
+                        </label>
+                        <div class="control">
+                            <input
+                                type="text"
+                                name="payment[bankslip_amount]"
+                                id="bankslippix_bankslip_amount"
+                                placeholder="0,00"
+                                class="input-text-vindi"
+                                data-bind="enable: isActive($parents)" />
+                        </div>
+                        <!-- Error message for bankslip amount -->
+                        <div class="field-error" data-bind="visible: showBankslipError">
+                            <span data-bind="text: bankslipErrorMessage"></span>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <div class="control">
+                            <small data-bind="i18n: 'Os dados para o pagamento serão exibidos após finalizar o pedido.'"></small>
+                        </div>
+                    </div>
+                    <div class="field number required">
+                        <label class="label" data-bind="i18n: 'CPF/CNPJ *'"></label>
+                        <div class="control">
+                            <input
+                                type="text"
+                                name="payment[bankslip_taxvat]"
+                                class="input-text-vindi cpf-cnpj"
+                                maxlength="14"
+                                data-bind="attr: {
+                                    title: $t('CPF'),
+                                    placeholder: $t('CPF'),
+                                    id: getCode() + '_taxvat',
+                                    'data-container': getCode() + '-taxvat',
+                                    'data-validate': getVatValidation()
+                                },
+                                enable: isActive($parents),
+                                value: taxvat,
+                                valueUpdate: 'keyup'" />
+                        </div>
+                    </div>
+
+                    <!-- Knockout-rendered messages, billing address, agreements, etc. -->
+                    <!-- ko foreach: getRegion('messages') --> <!-- ko template: getTemplate() --> <!-- /ko --> <!-- /ko -->
+                    <!-- ko if: isCheckoutPage() -->
+                    <div class="payment-method-billing-address">
+                        <!-- ko foreach: $parent.getRegion(getBillingAddressFormName()) -->
+                        <!-- ko template: getTemplate() --> <!-- /ko --> <!-- /ko -->
+                    </div>
+                    <div class="checkout-agreements-block">
+                        <!-- ko foreach: $parent.getRegion('before-place-order') -->
+                        <!-- ko template: getTemplate() --> <!-- /ko --> <!-- /ko -->
                     </div>
                     <!-- /ko -->
 
                 </fieldset>
             </form>
-        </div>
 
-        <div class="checkout-agreements-block">
-            <!-- ko foreach:$parent.getRegion('before-place-order') -->
-            <!-- ko template:getTemplate() --><!-- /ko -->
-            <!-- /ko -->
-        </div>
-
-        <div class="actions-toolbar">
-            <div class="primary">
-                <button class="action primary checkout" type="submit"
-                        data-bind="click:placeOrder,
-                           attr:{title:$t('Place Order')},
-                           css:{disabled:!isPlaceOrderActionAllowed()},
-                           enable:getCode()==isChecked()">
-                    <span data-bind="i18n:'Place Order'"></span>
-                </button>
+            <!-- Place Order button -->
+            <!-- ko if: isCheckoutPage() -->
+            <div class="actions-toolbar">
+                <div class="primary">
+                    <button
+                        type="submit"
+                        class="action primary checkout"
+                        data-bind="click: placeOrder, attr: {title: $t('Finalizar Pedido')}">
+                        <span data-bind="i18n: 'Finalizar Pedido'"></span>
+                    </button>
+                </div>
             </div>
+            <!-- /ko -->
+
         </div>
     </div>
 </div>

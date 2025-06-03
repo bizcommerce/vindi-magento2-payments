@@ -20,6 +20,9 @@
                 <item name="vindi_vp_bankslippix_config_provider" xsi:type="object">Vindi\VP\Model\Ui\BankSlipPix\ConfigProvider</item>
                 <item name="vindi_vp_pix_config_provider" xsi:type="object">Vindi\VP\Model\Ui\Pix\ConfigProvider</item>
                 <item name="vindi_vp_cc_config_provider" xsi:type="object">Vindi\VP\Model\Ui\CreditCard\ConfigProvider</item>
+                <item name="vindi_vp_cardpix" xsi:type="object">Vindi\VP\Model\Ui\CardPix\ConfigProvider</item>
+                <item name="vindi_vp_cardcard" xsi:type="object">Vindi\VP\Model\Ui\CardCard\ConfigProvider</item>
+                <item name="vindi_vp_cardbankslippix" xsi:type="object">Vindi\VP\Model\Ui\CardBankSlipPix\ConfigProvider</item>
             </argument>
         </arguments>
     </type>
@@ -48,13 +51,6 @@
         <arguments>
             <argument name="data" xsi:type="array">
                 <item xsi:type="string" name="is_secure_mode">1</item>
-            </argument>
-        </arguments>
-    </type>
-    <type name="Magento\Checkout\Model\CompositeConfigProvider">
-        <arguments>
-            <argument name="configProviders" xsi:type="array">
-                <item name="vindi_vp_cardpix" xsi:type="object">Vindi\VP\Model\Ui\CardPix\ConfigProvider</item>
             </argument>
         </arguments>
     </type>
