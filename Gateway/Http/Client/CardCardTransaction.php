@@ -22,10 +22,10 @@ use Vindi\VP\Helper\Data;
 use Vindi\VP\Model\AccessToken;
 
 /**
- * Class CardBankSlipPixTransaction
- * Handles the transaction for BankSlip + Pix payment method
+ * Class CardCardTransaction
+ * Handles the transaction for Card + Card payment method
  */
-class CardBankSlipPixTransaction implements ClientInterface
+class CardCardTransaction implements ClientInterface
 {
     /**
      * @var ZendClientFactory
@@ -58,7 +58,7 @@ class CardBankSlipPixTransaction implements ClientInterface
     private $methodCode;
 
     /**
-     * CardBankSlipPixTransaction constructor.
+     * CardCardTransaction constructor.
      *
      * @param ZendClientFactory $clientFactory
      * @param Logger $logger
@@ -73,7 +73,7 @@ class CardBankSlipPixTransaction implements ClientInterface
         Json $json,
         Data $helper,
         AccessToken $accessToken,
-        $methodCode = 'vindi_vp_cardbankslippix'
+        $methodCode = 'vindi_vp_cardcard'
     ) {
         $this->clientFactory = $clientFactory;
         $this->logger = $logger;
@@ -98,39 +98,39 @@ class CardBankSlipPixTransaction implements ClientInterface
 
         $storeId = $request['client_config']['store_id'] ?? null;
 
-        // Process bankslip payment request
-        $bankSlipResponse = $this->processBankSlipPayment($request['bankslip_request'], $storeId);
+        // Process first card payment request
+        $card1Response = $this->processCard1Payment($request['card1_request'], $storeId);
 
-        // If bankslip payment was successful, process PIX payment
-        if ($this->isSuccessfulBankSlipResponse($bankSlipResponse)) {
-            $pixResponse = $this->processPixPayment($request['pix_request'], $storeId);
+        // If first card payment was successful, process second card payment
+        if ($this->isSuccessfulCardResponse($card1Response)) {
+            $card2Response = $this->processCard2Payment($request['card2_request'], $storeId);
 
-            // If PIX payment failed, we need to cancel the bankslip payment
-            if (!$this->isSuccessfulPixResponse($pixResponse)) {
-                $this->cancelBankSlipPayment($bankSlipResponse, $storeId);
-                return ['error' => true, 'bankslip_response' => $bankSlipResponse, 'pix_response' => $pixResponse];
+            // If second card payment failed, we need to refund the first card payment
+            if (!$this->isSuccessfulCardResponse($card2Response)) {
+                $this->refundCardPayment($card1Response, $storeId);
+                return ['error' => true, 'card1_response' => $card1Response, 'card2_response' => $card2Response];
             }
 
             // Both transactions were successful
             return [
                 'success' => true,
-                'bankslip_response' => $bankSlipResponse,
-                'pix_response' => $pixResponse
+                'card1_response' => $card1Response,
+                'card2_response' => $card2Response
             ];
         }
 
-        // BankSlip payment failed, return the error
-        return ['error' => true, 'bankslip_response' => $bankSlipResponse];
+        // First card payment failed, return the error
+        return ['error' => true, 'card1_response' => $card1Response];
     }
 
     /**
-     * Process the bankslip payment portion of the transaction
+     * Process the first card payment portion of the transaction
      *
      * @param array $request
      * @param int|null $storeId
      * @return array
      */
-    private function processBankSlipPayment(array $request, ?int $storeId): array
+    private function processCard1Payment(array $request, ?int $storeId): array
     {
         try {
             $url = $this->helper->getApiUrl('payments');
@@ -167,13 +167,13 @@ class CardBankSlipPixTransaction implements ClientInterface
     }
 
     /**
-     * Process the PIX payment portion of the transaction
+     * Process the second card payment portion of the transaction
      *
      * @param array $request
      * @param int|null $storeId
      * @return array
      */
-    private function processPixPayment(array $request, ?int $storeId): array
+    private function processCard2Payment(array $request, ?int $storeId): array
     {
         try {
             $url = $this->helper->getApiUrl('payments');
@@ -210,13 +210,13 @@ class CardBankSlipPixTransaction implements ClientInterface
     }
 
     /**
-     * Cancel a bank slip payment
+     * Refund a card payment in case of error
      *
      * @param array $response
      * @param int|null $storeId
      * @return bool
      */
-    private function cancelBankSlipPayment(array $response, ?int $storeId): bool
+    private function refundCardPayment(array $response, ?int $storeId): bool
     {
         try {
             if (!isset($response['tid'])) {
@@ -238,39 +238,26 @@ class CardBankSlipPixTransaction implements ClientInterface
             // Log the response
             $this->logger->debug([
                 'method' => $this->methodCode,
-                'bankslipCancel' => $cancelResponse
+                'cardRefund' => $cancelResponse
             ]);
 
             return isset($cancelResponse['status_id']) && $cancelResponse['status_id'] == '5';
         } catch (\Exception $e) {
             $this->logger->debug([
                 'method' => $this->methodCode,
-                'bankslipCancelError' => $e->getMessage()
+                'cardRefundError' => $e->getMessage()
             ]);
             return false;
         }
     }
 
     /**
-     * Checks if the bank slip response was successful
+     * Checks if the card response was successful
      *
      * @param array $response
      * @return bool
      */
-    private function isSuccessfulBankSlipResponse(array $response): bool
-    {
-        return !isset($response['error']) &&
-            isset($response['status_id']) &&
-            in_array($response['status_id'], ['3', '4']);
-    }
-
-    /**
-     * Checks if the PIX response was successful
-     *
-     * @param array $response
-     * @return bool
-     */
-    private function isSuccessfulPixResponse(array $response): bool
+    private function isSuccessfulCardResponse(array $response): bool
     {
         return !isset($response['error']) &&
             isset($response['status_id']) &&
