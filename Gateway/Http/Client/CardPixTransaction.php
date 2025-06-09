@@ -92,26 +92,27 @@ class CardPixTransaction implements ClientInterface
     public function placeRequest(TransferInterface $transferObject): array
     {
         $request = $transferObject->getBody();
-
-        // Log the request data with sensitive information masked
         $this->logRequest($request);
-
         $storeId = $request['client_config']['store_id'] ?? null;
 
-        // Process card payment request
+        // Dispara a transação do cartão primeiro
         $cardResponse = $this->processCardPayment($request['card_request'], $storeId);
 
-        // If card payment was successful, process PIX payment
+        // Se cartão aprovado, dispara Pix
         if ($this->isSuccessfulCardResponse($cardResponse)) {
             $pixResponse = $this->processPixPayment($request['pix_request'], $storeId);
 
-            // If PIX payment failed, we need to refund the card payment
+            // Se Pix falhar, estorna cartão
             if (!$this->isSuccessfulPixResponse($pixResponse)) {
                 $this->refundCardPayment($cardResponse, $storeId);
-                return ['error' => true, 'card_response' => $cardResponse, 'pix_response' => $pixResponse];
+                return [
+                    'error' => true,
+                    'card_response' => $cardResponse,
+                    'pix_response' => $pixResponse
+                ];
             }
 
-            // Both transactions were successful
+            // Sucesso nos dois meios
             return [
                 'success' => true,
                 'card_response' => $cardResponse,
@@ -119,8 +120,11 @@ class CardPixTransaction implements ClientInterface
             ];
         }
 
-        // Card payment failed, return the error
-        return ['error' => true, 'card_response' => $cardResponse];
+        // Cartão recusado
+        return [
+            'error' => true,
+            'card_response' => $cardResponse
+        ];
     }
 
     /**

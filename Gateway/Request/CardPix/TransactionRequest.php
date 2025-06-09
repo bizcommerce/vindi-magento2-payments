@@ -114,15 +114,61 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         $payment = $buildSubject['payment']->getPayment();
         $order = $payment->getOrder();
 
-        // Get split amounts from payment additional information
+        // Valores informados no checkout
         $amountCredit = (float)$payment->getAdditionalInformation('amount_credit');
         $amountPix = (float)$payment->getAdditionalInformation('amount_pix');
+        $totalPaid = $amountCredit + $amountPix;
 
-        // Build the transaction request for credit card
-        $cardRequest = $this->buildCardRequest($order, $payment, $amountCredit, $amountPix);
+        // Valores originais do pedido
+        $subtotal = (float)$order->getBaseSubtotal();
+        $shipping = (float)$order->getShippingAmount();
+        $discount = abs((float)$order->getDiscountAmount());
 
-        // Build the transaction request for PIX
-        $pixRequest = $this->buildPixRequest($order, $payment, $amountCredit, $amountPix);
+        // Converter para centavos
+        $subtotalCents = (int)round($subtotal * 100);
+        $shippingCents = (int)round($shipping * 100);
+        $discountCents = (int)round($discount * 100);
+        $creditCents = (int)round($amountCredit * 100);
+        $pixCents = (int)round($amountPix * 100);
+        $totalCents = $creditCents + $pixCents;
+
+        // Proporção de cada meio
+        $propCredit = $totalCents > 0 ? $creditCents / $totalCents : 0;
+        $propPix = $totalCents > 0 ? $pixCents / $totalCents : 0;
+
+        // Rateio de frete
+        $shippingCredit = (int)floor($shippingCents * $propCredit);
+        $shippingPix = (int)floor($shippingCents * $propPix);
+        $shippingDiff = $shippingCents - ($shippingCredit + $shippingPix);
+        if ($shippingDiff !== 0) {
+            if ($creditCents >= $pixCents) {
+                $shippingCredit += $shippingDiff;
+            } else {
+                $shippingPix += $shippingDiff;
+            }
+        }
+
+        // Rateio de desconto
+        $discountCredit = (int)floor($discountCents * $propCredit);
+        $discountPix = (int)floor($discountCents * $propPix);
+        $discountDiff = $discountCents - ($discountCredit + $discountPix);
+        if ($discountDiff !== 0) {
+            if ($creditCents >= $pixCents) {
+                $discountCredit += $discountDiff;
+            } else {
+                $discountPix += $discountDiff;
+            }
+        }
+
+        // Converter de volta para reais
+        $shippingCreditReal = $shippingCredit / 100;
+        $shippingPixReal = $shippingPix / 100;
+        $discountCreditReal = $discountCredit / 100;
+        $discountPixReal = $discountPix / 100;
+
+        // Build as requisições separadas
+        $cardRequest = $this->buildCardRequest($order, $payment, $amountCredit, $amountPix, $shippingCreditReal, $discountCreditReal);
+        $pixRequest = $this->buildPixRequest($order, $payment, $amountCredit, $amountPix, $shippingPixReal, $discountPixReal);
 
         return [
             'card_request' => $cardRequest,
@@ -138,15 +184,18 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
      * @param \Magento\Sales\Model\Order\Payment $payment
      * @param float $amountCredit
      * @param float $amountPix
+     * @param float $shipping
+     * @param float $discount
      * @return array
      */
-    private function buildCardRequest($order, $payment, float $amountCredit, float $amountPix): array
+    private function buildCardRequest($order, $payment, float $amountCredit, float $amountPix, float $shipping, float $discount): array
     {
         // Get the base transaction request
         $transaction = $this->getTransaction($order, $amountCredit);
 
         // Apply discount for the PIX portion
-        $transaction['transaction']['price_discount'] = (string)$amountPix;
+        $transaction['transaction']['price_discount'] = (string)$discount;
+        $transaction['transaction_shipping']['shipping_price'] = (string)$shipping;
 
         // Add credit card payment data
         $paymentProfileId = $payment->getAdditionalInformation('payment_profile');
@@ -166,15 +215,18 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
      * @param \Magento\Sales\Model\Order\Payment $payment
      * @param float $amountCredit
      * @param float $amountPix
+     * @param float $shipping
+     * @param float $discount
      * @return array
      */
-    private function buildPixRequest($order, $payment, float $amountCredit, float $amountPix): array
+    private function buildPixRequest($order, $payment, float $amountCredit, float $amountPix, float $shipping, float $discount): array
     {
         // Get the base transaction request
         $transaction = $this->getTransaction($order, $amountPix);
 
         // Apply discount for the Credit Card portion
-        $transaction['transaction']['price_discount'] = (string)$amountCredit;
+        $transaction['transaction']['price_discount'] = (string)$discount;
+        $transaction['transaction_shipping']['shipping_price'] = (string)$shipping;
 
         // Add PIX payment data
         $transaction['payment'] = [

@@ -348,17 +348,17 @@ define(
              */
             getData: function () {
                 fingerprint(window.checkoutConfig.payment[this.getCode()].sandbox);
-
                 var ccExpMonth = '';
                 var ccExpYear = '';
                 var ccExpDate = this.creditCardExpDate();
-
                 if (typeof ccExpDate !== "undefined" && ccExpDate !== null) {
                     var ccExpDateFull = ccExpDate.split('/');
                     ccExpMonth = ccExpDateFull[0];
                     ccExpYear = ccExpDateFull[1];
                 }
-
+                // Captura os valores dos inputs de split
+                var amountCredit = parseFloat($('#card_amount').val() || 0);
+                var amountPix = parseFloat($('#pix_amount').val() || 0);
                 return {
                     'method': this.item.method,
                     'additional_data': {
@@ -372,7 +372,9 @@ define(
                         'cc_owner': this.creditCardOwner(),
                         'installments': this.creditCardInstallments(),
                         'save_card': this.saveCard() ? 1 : 0,
-                        'fingerprint': (window.yapay && window.yapay.FingerPrint) ? window.yapay.FingerPrint().getFingerPrint() : ''
+                        'fingerprint': (window.yapay && window.yapay.FingerPrint) ? window.yapay.FingerPrint().getFingerPrint() : '',
+                        'amount_credit': amountCredit,
+                        'amount_pix': amountPix
                     }
                 };
             },
