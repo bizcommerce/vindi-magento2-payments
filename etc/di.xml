@@ -155,11 +155,17 @@
         </arguments>
     </virtualType>
 
-    <!-- Card + Pix Order Request -->
+    <!-- Card + Pix Transaction Request -->
+    <virtualType name="VindiCardPixTransactionRequest" type="Vindi\VP\Gateway\Request\CardPix\TransactionRequest">
+        <arguments>
+            <argument name="config" xsi:type="object">VindiCardPixConfig</argument>
+        </arguments>
+    </virtualType>
+    <!-- Card + Pix Order Request (corrigido para usar o builder correto) -->
     <virtualType name="VindiCardPixOrderRequest" type="Magento\Payment\Gateway\Request\BuilderComposite">
         <arguments>
             <argument name="builders" xsi:type="array">
-                <item name="transaction" xsi:type="string">VindiPixTransactionRequest</item>
+                <item name="transaction" xsi:type="string">VindiCardPixTransactionRequest</item>
             </argument>
         </arguments>
     </virtualType>
@@ -623,14 +629,7 @@
         </arguments>
     </virtualType>
 
-    <!-- Card + Card Transaction Request -->
-    <virtualType name="VindiCardCardTransactionRequest" type="Vindi\VP\Gateway\Request\CardCard\TransactionRequest">
-        <arguments>
-            <argument name="config" xsi:type="object">VindiCardCardConfig</argument>
-        </arguments>
-    </virtualType>
-
-    <!-- Card+Pix Validator Pool -->
+    <!-- Card + Pix Validator Pool -->
     <virtualType name="VindiCardPixValidatorPool" type="Magento\Payment\Gateway\Validator\ValidatorPool">
         <arguments>
             <argument name="validators" xsi:type="array">
