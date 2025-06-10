@@ -49,4 +49,14 @@
     <event name="sales_order_shipment_track_save_after">
         <observer name="vindi_vp_send_tracking" instance="Vindi\VP\Observer\Sales\SendTrackingData" />
     </event>
+
+    <event name="payment_method_assign_data_vindi_vp_cardpix">
+        <observer name="vindi_vp_cardpix_credit_card_assign" instance="Vindi\VP\Observer\CreditCardAssignObserver"/>
+    </event>
+    <event name="payment_method_assign_data_vindi_vp_cardcard">
+        <observer name="vindi_vp_cardcard_credit_card_assign" instance="Vindi\VP\Observer\CreditCardAssignObserver"/>
+    </event>
+    <event name="payment_method_assign_data_vindi_vp_cardbankslippix">
+        <observer name="vindi_vp_cardbankslippix_credit_card_assign" instance="Vindi\VP\Observer\CreditCardAssignObserver"/>
+    </event>
 </config>

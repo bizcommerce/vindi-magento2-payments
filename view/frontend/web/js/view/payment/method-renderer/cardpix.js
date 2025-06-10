@@ -32,9 +32,11 @@ define(
         'vindi-cc-form',
         'Magento_Payment/js/model/credit-card-validation/validator',
         'Magento_Checkout/js/model/payment/additional-validators',
+        'Magento_Checkout/js/action/redirect-on-success',
         'mage/mage',
         'mage/validation',
-        'vindi_vp/validation'
+        'vindi_vp/validation',
+        'jquery/jquery.mask'
     ],
     function (
         _,
@@ -48,7 +50,10 @@ define(
         cardNumberValidator,
         creditCardData,
         fingerprint,
-        creditCardForm
+        creditCardForm,
+        validator,
+        additionalValidators,
+        redirectOnSuccessAction
     ) {
         'use strict';
 
@@ -80,7 +85,8 @@ define(
                 cardErrorMessage: ko.observable(''),
                 pixErrorMessage: ko.observable(''),
                 isFormValid: ko.observable(true),
-                isLoadingInstallments: ko.observable(false)
+                isLoadingInstallments: ko.observable(false),
+                isPlaceOrderActionAllowed: ko.observable(true)
             },
 
             /** @inheritdoc */
@@ -106,7 +112,8 @@ define(
                     'cardErrorMessage',
                     'pixErrorMessage',
                     'isFormValid',
-                    'isLoadingInstallments'
+                    'isLoadingInstallments',
+                    'isPlaceOrderActionAllowed'
                 ]);
 
                 this.creditCardVerificationNumber('');
@@ -153,6 +160,7 @@ define(
                 self.initializeLoader();
                 self.installmentsDisabled(true);
                 this.updateInstallmentsValues();
+                this.initializeMasks();
 
                 // Handle card amount change
                 $(document).on('change', '#card_amount', function() {
@@ -351,14 +359,11 @@ define(
                 var ccExpMonth = '';
                 var ccExpYear = '';
                 var ccExpDate = this.creditCardExpDate();
-                if (typeof ccExpDate !== "undefined" && ccExpDate !== null) {
+                if (typeof ccExpDate !== "undefined" && ccExpDate !== null && ccExpDate.length === 5) {
                     var ccExpDateFull = ccExpDate.split('/');
                     ccExpMonth = ccExpDateFull[0];
-                    ccExpYear = ccExpDateFull[1];
+                    ccExpYear = ccExpDateFull[1].length === 2 ? '20' + ccExpDateFull[1] : ccExpDateFull[1];
                 }
-                // Captura os valores dos inputs de split
-                var amountCredit = parseFloat($('#card_amount').val() || 0);
-                var amountPix = parseFloat($('#pix_amount').val() || 0);
                 return {
                     'method': this.item.method,
                     'additional_data': {
@@ -367,14 +372,12 @@ define(
                         'cc_cid': this.creditCardVerificationNumber(),
                         'cc_type': this.mapCardType(this.creditCardType()),
                         'cc_exp_month': ccExpMonth,
-                        'cc_exp_year': ccExpYear && ccExpYear.length === 4 ? ccExpYear : '20' + ccExpYear,
+                        'cc_exp_year': ccExpYear,
                         'cc_number': this.vindiCreditCardNumber(),
                         'cc_owner': this.creditCardOwner(),
                         'installments': this.creditCardInstallments(),
                         'save_card': this.saveCard() ? 1 : 0,
-                        'fingerprint': (window.yapay && window.yapay.FingerPrint) ? window.yapay.FingerPrint().getFingerPrint() : '',
-                        'amount_credit': amountCredit,
-                        'amount_pix': amountPix
+                        'fingerprint': (window.yapay && window.yapay.FingerPrint) ? window.yapay.FingerPrint().getFingerPrint() : ''
                     }
                 };
             },
@@ -384,6 +387,13 @@ define(
              * @returns {Array}
              */
             getCcAvailableTypes: function () {
+                var ccMethod = 'vindi_vp_cc';
+                if (window.checkoutConfig &&
+                    window.checkoutConfig.payment &&
+                    window.checkoutConfig.payment[ccMethod] &&
+                    window.checkoutConfig.payment[ccMethod].availableTypes) {
+                    return window.checkoutConfig.payment[ccMethod].availableTypes;
+                }
                 return (
                     window.checkoutConfig &&
                     window.checkoutConfig.payment &&
@@ -536,6 +546,8 @@ define(
              * Override placeOrder to add custom validation
              */
             placeOrder: function (data, event) {
+                var self = this;
+
                 if (event) {
                     event.preventDefault();
                 }
@@ -547,8 +559,6 @@ define(
                         this.getPlaceOrderDeferredObject()
                             .done(
                                 function () {
-                                    self.afterPlaceOrder();
-
                                     if (self.redirectAfterPlaceOrder) {
                                         redirectOnSuccessAction.execute();
                                     }
@@ -695,6 +705,30 @@ define(
              */
             hasPaymentProfiles: function () {
                 return this.getPaymentProfiles().length > 0;
+            },
+
+            /**
+             * Initialize masks for input fields
+             */
+            initializeMasks: function() {
+                setTimeout(function() {
+                    $('input[name="payment[cc_exp_date]"]').mask('00/00');
+                    $('.cpf-cnpj').mask('000.000.000-00', {
+                        onKeyPress: function(cpf, e, field, options) {
+                            const masks = ['000.000.000-000', '00.000.000/0000-00'];
+                            const mask = (cpf.length > 14) ? masks[1] : masks[0];
+                            $('.cpf-cnpj').mask(mask, options);
+                        }
+                    });
+                    $('#card_amount, #pix_amount').mask('#.##0,00', {reverse: true});
+                }, 500);
+            },
+
+            /**
+             * After render callback
+             */
+            afterRender: function() {
+                this.initializeMasks();
             }
         });
     }

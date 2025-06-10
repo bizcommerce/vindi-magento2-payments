@@ -26,6 +26,8 @@ use Magento\Framework\Event\ManagerInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\Session\SessionManagerInterface;
 use Vindi\VP\Gateway\Request\PaymentsRequest;
+use Magento\Framework\App\ObjectManager;
+use Psr\Log\LoggerInterface;
 
 /**
  * Class TransactionRequest
@@ -97,7 +99,7 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
     }
 
     /**
-     * Builds ENV request
+     * Builds only the Card request (temporarily disables Pix split)
      *
      * @param array $buildSubject
      * @return array
@@ -114,65 +116,14 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         $payment = $buildSubject['payment']->getPayment();
         $order = $payment->getOrder();
 
-        // Valores informados no checkout
-        $amountCredit = (float)$payment->getAdditionalInformation('amount_credit');
-        $amountPix = (float)$payment->getAdditionalInformation('amount_pix');
-        $totalPaid = $amountCredit + $amountPix;
+        // Valor total do pedido
+        $amountCredit = (float)$order->getGrandTotal();
 
-        // Valores originais do pedido
-        $subtotal = (float)$order->getBaseSubtotal();
-        $shipping = (float)$order->getShippingAmount();
-        $discount = abs((float)$order->getDiscountAmount());
-
-        // Converter para centavos
-        $subtotalCents = (int)round($subtotal * 100);
-        $shippingCents = (int)round($shipping * 100);
-        $discountCents = (int)round($discount * 100);
-        $creditCents = (int)round($amountCredit * 100);
-        $pixCents = (int)round($amountPix * 100);
-        $totalCents = $creditCents + $pixCents;
-
-        // Proporção de cada meio
-        $propCredit = $totalCents > 0 ? $creditCents / $totalCents : 0;
-        $propPix = $totalCents > 0 ? $pixCents / $totalCents : 0;
-
-        // Rateio de frete
-        $shippingCredit = (int)floor($shippingCents * $propCredit);
-        $shippingPix = (int)floor($shippingCents * $propPix);
-        $shippingDiff = $shippingCents - ($shippingCredit + $shippingPix);
-        if ($shippingDiff !== 0) {
-            if ($creditCents >= $pixCents) {
-                $shippingCredit += $shippingDiff;
-            } else {
-                $shippingPix += $shippingDiff;
-            }
-        }
-
-        // Rateio de desconto
-        $discountCredit = (int)floor($discountCents * $propCredit);
-        $discountPix = (int)floor($discountCents * $propPix);
-        $discountDiff = $discountCents - ($discountCredit + $discountPix);
-        if ($discountDiff !== 0) {
-            if ($creditCents >= $pixCents) {
-                $discountCredit += $discountDiff;
-            } else {
-                $discountPix += $discountDiff;
-            }
-        }
-
-        // Converter de volta para reais
-        $shippingCreditReal = $shippingCredit / 100;
-        $shippingPixReal = $shippingPix / 100;
-        $discountCreditReal = $discountCredit / 100;
-        $discountPixReal = $discountPix / 100;
-
-        // Build as requisições separadas
-        $cardRequest = $this->buildCardRequest($order, $payment, $amountCredit, $amountPix, $shippingCreditReal, $discountCreditReal);
-        $pixRequest = $this->buildPixRequest($order, $payment, $amountCredit, $amountPix, $shippingPixReal, $discountPixReal);
+        // Build only the card request (flat)
+        $cardRequest = $this->buildCardRequest($order, $payment, $amountCredit, 0, (float)$order->getShippingAmount(), abs((float)$order->getDiscountAmount()));
 
         return [
-            'card_request' => $cardRequest,
-            'pix_request' => $pixRequest,
+            'request' => $cardRequest,
             'client_config' => ['store_id' => (int)$order->getStoreId()]
         ];
     }
@@ -292,26 +243,57 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
      */
     protected function getNewCardData($payment): array
     {
+        $order = $payment->getOrder();
         $saveCard = $payment->getAdditionalInformation('save_card');
-        $installments = $payment->getAdditionalInformation('installments') ?: 1;
+
+        // Garante que os dados do cartão venham do lugar correto
+        $ccType = $payment->getAdditionalInformation('cc_type') ?? $payment->getCcType() ?? '';
+        $ccOwner = $payment->getAdditionalInformation('cc_owner') ?? $payment->getCcOwner() ?? '';
+        $ccNumber = $payment->getAdditionalInformation('cc_number') ?? $payment->getCcNumber() ?? '';
+        $ccLast4 = $payment->getAdditionalInformation('cc_last_4') ?? $payment->getCcLast4() ?? (is_string($ccNumber) ? substr($ccNumber, -4) : '');
+        $ccExpMonth = $payment->getAdditionalInformation('cc_exp_month') ?? $payment->getCcExpMonth() ?? '';
+        $ccExpYear = $payment->getAdditionalInformation('cc_exp_year') ?? $payment->getCcExpYear() ?? '';
+        $ccCid = $payment->getAdditionalInformation('cc_cid') ?? $payment->getCcCid() ?? '';
+        $installments = $payment->getAdditionalInformation('installments') ?? 1;
+        $fingerprint = $payment->getAdditionalInformation('fingerprint');
 
         if ($saveCard) {
             $encryptedData = $this->encryptor->encrypt(json_encode([
-                'cc_last_4' => substr($payment->getAdditionalInformation('cc_number_masked'), -4),
-                'cc_exp_date' => $payment->getAdditionalInformation('cc_exp_month') . '/' . $payment->getAdditionalInformation('cc_exp_year'),
-                'cc_name' => $payment->getAdditionalInformation('cc_owner')
+                'cc_last_4' => $ccLast4,
+                'cc_exp_date' => $ccExpMonth . '/' . $ccExpYear,
+                'cc_name' => $ccOwner
             ]));
             $this->session->setData('encrypted_card_info', $encryptedData);
         }
 
-        return [
-            'payment_method_id'  => $this->helper->getMethodId($payment->getAdditionalInformation('cc_type')),
-            'card_name'          => $payment->getAdditionalInformation('cc_owner'),
-            'card_number'        => $payment->getAdditionalInformation('cc_number'),
-            'card_expdate_month' => $payment->getAdditionalInformation('cc_exp_month'),
-            'card_expdate_year'  => $payment->getAdditionalInformation('cc_exp_year'),
-            'card_cvv'           => $payment->getAdditionalInformation('cc_cid'),
-            'split'              => (string)$installments
+        // Log dos dados recebidos do cartão para debug
+        if (class_exists('Magento\\Framework\\App\\ObjectManager')) {
+            $logger = \Magento\Framework\App\ObjectManager::getInstance()->get(\Psr\Log\LoggerInterface::class);
+            $logger->debug('[CardPix][getNewCardData] Dados recebidos:', [
+                'cc_type' => $ccType,
+                'cc_owner' => $ccOwner,
+                'cc_number' => $ccNumber,
+                'cc_exp_month' => $ccExpMonth,
+                'cc_exp_year' => $ccExpYear,
+                'cc_cid' => $ccCid,
+                'installments' => $installments,
+                'fingerprint' => $fingerprint,
+                'save_card' => $saveCard
+            ]);
+        }
+
+        $cardData = [
+            'payment_method_id'  => $this->helper->getMethodId((string)$ccType),
+            'card_name'          => $ccOwner,
+            'card_number'        => $ccNumber,
+            'card_expdate_month' => $ccExpMonth,
+            'card_expdate_year'  => $ccExpYear,
+            'card_cvv'           => $ccCid,
+            'split'              => (string)($installments ?: 1)
         ];
+        if ($fingerprint) {
+            $cardData['fingerprint'] = $fingerprint;
+        }
+        return $cardData;
     }
 }

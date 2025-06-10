@@ -65,7 +65,21 @@ class CreditCardAssignObserver extends AbstractDataAssignObserver
         $additionalData = $data->getAdditionalData();
 
         if (!empty($additionalData)) {
-            if (isset($additionalData['cc_number'])) {
+            // Recupera o modelo de pagamento
+            /** @var Payment $paymentInfo */
+            $paymentInfo = $this->readPaymentModelArgument($observer);
+            $method = $paymentInfo->getMethod();
+
+            // Métodos que precisam receber os dados do cartão
+            $metodosQuePrecisamDeCartao = [
+                'vindi_vp_cc',
+                'vindi_vp_cardpix',
+                'vindi_vp_cardbankslippix',
+                'vindi_vp_cardcard',
+                // Adicione outros métodos multimeios aqui se necessário
+            ];
+
+            if (isset($additionalData['cc_number']) && in_array($method, $metodosQuePrecisamDeCartao)) {
                 $installments = $additionalData['installments'] ?? 1;
                 $ccOwner = $additionalData['cc_owner'] ?? null;
                 $ccType = $additionalData['cc_type'] ?? null;
@@ -77,9 +91,6 @@ class CreditCardAssignObserver extends AbstractDataAssignObserver
                 $saveCard = $additionalData['save_card'] ?? 0;
 
                 $this->updateInterest((int) $installments);
-
-                /** @var Payment $paymentInfo */
-                $paymentInfo = $this->readPaymentModelArgument($observer);
 
                 $paymentInfo->addData([
                     'cc_type' => $ccType,
