@@ -99,7 +99,7 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
     }
 
     /**
-     * Builds only the Card request (temporarily disables Pix split)
+     * Builds the CardPix (Card + Pix) or pure Card request
      *
      * @param array $buildSubject
      * @return array
@@ -116,14 +116,35 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         $payment = $buildSubject['payment']->getPayment();
         $order = $payment->getOrder();
 
-        // Valor total do pedido
-        $amountCredit = (float)$order->getGrandTotal();
+        // Sempre fluxo cartão + pix
+        $grandTotal = (float)$order->getGrandTotal();
+        $shipping = (float)$order->getShippingAmount();
+        $discount = abs((float)$order->getDiscountAmount());
 
-        // Build only the card request (flat)
-        $cardRequest = $this->buildCardRequest($order, $payment, $amountCredit, 0, (float)$order->getShippingAmount(), abs((float)$order->getDiscountAmount()));
+        // Valores de split vindos do frontend (garantir fallback)
+        $amountCredit = (float)($payment->getAdditionalInformation('amount_credit') ?? 0);
+        $amountPix = (float)($payment->getAdditionalInformation('amount_pix') ?? 0);
+
+        // Fallback: se não vierem, dividir meio a meio
+        if ($amountCredit <= 0 && $amountPix <= 0) {
+            $amountCredit = round($grandTotal / 2, 2);
+            $amountPix = $grandTotal - $amountCredit;
+        }
+
+        // Proporção para shipping e desconto
+        $totalSplit = $amountCredit + $amountPix;
+        $shippingCard = $totalSplit > 0 ? round($shipping * ($amountCredit / $totalSplit), 2) : 0;
+        $shippingPix = $shipping - $shippingCard;
+        $discountCard = $totalSplit > 0 ? round($discount * ($amountCredit / $totalSplit), 2) : 0;
+        $discountPix = $discount - $discountCard;
+
+        // Montar requests separados
+        $cardRequest = $this->buildCardRequest($order, $payment, $amountCredit, $amountPix, $shippingCard, $discountCard);
+        $pixRequest = $this->buildPixRequest($order, $payment, $amountCredit, $amountPix, $shippingPix, $discountPix);
 
         return [
-            'request' => $cardRequest,
+            'request_card' => $cardRequest,
+            'request_pix' => $pixRequest,
             'client_config' => ['store_id' => (int)$order->getStoreId()]
         ];
     }
@@ -144,7 +165,7 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         // Get the base transaction request
         $transaction = $this->getTransaction($order, $amountCredit);
 
-        // Apply discount for the PIX portion
+        // Aplicar desconto e frete proporcionais ao cartão
         $transaction['transaction']['price_discount'] = (string)$discount;
         $transaction['transaction_shipping']['shipping_price'] = (string)$shipping;
 
@@ -175,7 +196,7 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         // Get the base transaction request
         $transaction = $this->getTransaction($order, $amountPix);
 
-        // Apply discount for the Credit Card portion
+        // Aplicar desconto e frete proporcionais ao pix
         $transaction['transaction']['price_discount'] = (string)$discount;
         $transaction['transaction_shipping']['shipping_price'] = (string)$shipping;
 
@@ -246,7 +267,6 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         $order = $payment->getOrder();
         $saveCard = $payment->getAdditionalInformation('save_card');
 
-        // Garante que os dados do cartão venham do lugar correto
         $ccType = $payment->getAdditionalInformation('cc_type') ?? $payment->getCcType() ?? '';
         $ccOwner = $payment->getAdditionalInformation('cc_owner') ?? $payment->getCcOwner() ?? '';
         $ccNumber = $payment->getAdditionalInformation('cc_number') ?? $payment->getCcNumber() ?? '';
@@ -266,22 +286,6 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
             $this->session->setData('encrypted_card_info', $encryptedData);
         }
 
-        // Log dos dados recebidos do cartão para debug
-        if (class_exists('Magento\\Framework\\App\\ObjectManager')) {
-            $logger = \Magento\Framework\App\ObjectManager::getInstance()->get(\Psr\Log\LoggerInterface::class);
-            $logger->debug('[CardPix][getNewCardData] Dados recebidos:', [
-                'cc_type' => $ccType,
-                'cc_owner' => $ccOwner,
-                'cc_number' => $ccNumber,
-                'cc_exp_month' => $ccExpMonth,
-                'cc_exp_year' => $ccExpYear,
-                'cc_cid' => $ccCid,
-                'installments' => $installments,
-                'fingerprint' => $fingerprint,
-                'save_card' => $saveCard
-            ]);
-        }
-
         $cardData = [
             'payment_method_id'  => $this->helper->getMethodId((string)$ccType),
             'card_name'          => $ccOwner,
@@ -291,9 +295,11 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
             'card_cvv'           => $ccCid,
             'split'              => (string)($installments ?: 1)
         ];
+
         if ($fingerprint) {
             $cardData['fingerprint'] = $fingerprint;
         }
+
         return $cardData;
     }
 }
