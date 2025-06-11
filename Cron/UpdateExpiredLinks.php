@@ -12,14 +12,16 @@ class UpdateExpiredLinks
     /**
      * @var PaymentLinkService
      */
-    private PaymentLinkService $paymentLinkService;
+    private $paymentLinkService;
 
     /**
      * @var LoggerInterface
      */
-    private LoggerInterface $logger;
+    private $logger;
 
     /**
+     * Constructor.
+     *
      * @param PaymentLinkService $paymentLinkService
      * @param LoggerInterface $logger
      */
@@ -33,6 +35,8 @@ class UpdateExpiredLinks
 
     /**
      * Execute the cron job to update the status of expired payment links.
+     *
+     * @return void
      */
     public function execute(): void
     {

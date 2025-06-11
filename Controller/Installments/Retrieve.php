@@ -1,7 +1,8 @@
 <?php
 
+declare(strict_types=1);
+
 /**
- *
  *
  *
  * @category    Vindi
@@ -47,6 +48,8 @@ class Retrieve extends Action implements HttpPostActionInterface, CsrfAwareActio
     protected $session;
 
     /**
+     * Retrieve constructor.
+     *
      * @param Context $context
      * @param Json $json
      * @param Session $checkoutSession
@@ -73,17 +76,23 @@ class Retrieve extends Action implements HttpPostActionInterface, CsrfAwareActio
         parent::__construct($context);
     }
 
+    /**
+     * Execute action
+     *
+     * @return \Magento\Framework\Controller\Result\Json
+     */
     public function execute()
     {
         $result = $this->resultJsonFactory->create();
         $result->setHttpResponseCode(401);
 
-        try{
+        try {
             $content = $this->getRequest()->getContent();
             $bodyParams = ($content) ? $this->json->unserialize($content) : [];
-            $ccType = $bodyParams['cc_type'] ?? '';
+            $ccType = isset($bodyParams['cc_type']) ? $bodyParams['cc_type'] : '';
 
-            $result->setJsonData($this->json->serialize($this->getInstallments($ccType)));
+            $installments = $this->getInstallments($ccType);
+            $result->setJsonData($this->json->serialize($installments));
             $result->setHttpResponseCode(200);
         } catch (\Exception $e) {
             $result->setHttpResponseCode(500);
@@ -93,38 +102,58 @@ class Retrieve extends Action implements HttpPostActionInterface, CsrfAwareActio
     }
 
     /**
+     * Get Installments
+     *
+     * @param string $ccType
+     * @return array
      * @throws NoSuchEntityException
      * @throws LocalizedException
      */
-    public function getInstallments(string $ccType): array
+    public function getInstallments($ccType)
     {
         $this->session->setVindiCcType($ccType);
-        $grandTotal = $this->getPaymentLinkGrandTotal() ?? $this->checkoutSession->getQuote()->getGrandTotal();
+        $grandTotal = $this->getPaymentLinkGrandTotal();
+        if ($grandTotal === null) {
+            $grandTotal = $this->checkoutSession->getQuote()->getGrandTotal();
+        }
         $storeId = $this->checkoutSession->getQuote()->getStoreId();
+
         return $this->helperInstallments->getAllInstallments($grandTotal, $ccType, $storeId);
     }
 
-    public function createCsrfValidationException(RequestInterface $request): ?InvalidRequestException
+    /**
+     * Create CSRF validation exception
+     *
+     * @param RequestInterface $request
+     * @return InvalidRequestException|null
+     */
+    public function createCsrfValidationException(RequestInterface $request)
     {
         $result = $this->resultFactory->create(ResultFactory::TYPE_RAW);
         $result->setHttpResponseCode(403);
-        return new InvalidRequestException(
-            $result
-        );
+        return new InvalidRequestException($result);
     }
 
-    public function validateForCsrf(RequestInterface $request): ?bool
+    /**
+     * Validate for CSRF
+     *
+     * @param RequestInterface $request
+     * @return bool|null
+     */
+    public function validateForCsrf(RequestInterface $request)
     {
         return true;
     }
 
     /**
-     * @return mixed|null
+     * Get grand total from payment link data if available
+     *
+     * @return float|null
      */
     public function getPaymentLinkGrandTotal()
     {
         $content = $this->getRequest()->getContent();
         $bodyParams = ($content) ? $this->json->unserialize($content) : [];
-        return $bodyParams['payment_link']['grand_total'] ?? null;
+        return isset($bodyParams['payment_link']['grand_total']) ? $bodyParams['payment_link']['grand_total'] : null;
     }
 }

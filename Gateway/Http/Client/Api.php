@@ -10,7 +10,6 @@
  * @category    Vindi
  * @package     Vindi_VP
  *
- *
  */
 
 namespace Vindi\VP\Gateway\Http\Client;
@@ -109,29 +108,35 @@ class Api
     }
 
     /**
-     * @param $request
+     *
+     * @param mixed $request
      * @param string $name
+     * @return void
      */
-    public function logRequest($request, $name = 'vindi-vp'): void
+    public function logRequest($request, $name = 'vindi-vp')
     {
         $this->logger->execute('Request', $name);
         $this->logger->execute($request, $name);
     }
 
     /**
-     * @param $response
+     *
+     * @param mixed $response
      * @param string $name
+     * @return void
      */
-    public function logResponse($response, $name = 'vindi-vp'): void
+    public function logResponse($response, $name = 'vindi-vp')
     {
         $this->logger->execute('RESPONSE', $name);
         $this->logger->execute($response, $name);
     }
 
     /**
-     * @param $request
-     * @param $response
-     * @param $statusCode
+     *
+     * @param mixed $request
+     * @param mixed $response
+     * @param int $statusCode
+     * @param string $method
      * @return void
      */
     public function saveRequest(

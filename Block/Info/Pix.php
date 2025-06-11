@@ -23,6 +23,11 @@ use Magento\Payment\Model\Config;
 
 class Pix extends AbstractInfo
 {
+    /**
+     * Template path
+     *
+     * @var string
+     */
     protected $_template = 'Vindi_VP::payment/info/pix.phtml';
 
     /**
@@ -36,7 +41,7 @@ class Pix extends AbstractInfo
     protected $paymentConfig;
 
     /**
-     * @var  DateTime
+     * @var DateTime
      */
     protected $date;
 
@@ -46,7 +51,8 @@ class Pix extends AbstractInfo
     protected $priceCurrency;
 
     /**
-     * BankSlip constructor.
+     * Pix constructor.
+     *
      * @param Context $context
      * @param ConfigInterface $config
      * @param Config $paymentConfig
@@ -69,7 +75,9 @@ class Pix extends AbstractInfo
     }
 
     /**
-     * @inheritDoc
+     * Initialize block template.
+     *
+     * @return void
      */
     public function _construct()
     {
@@ -77,22 +85,28 @@ class Pix extends AbstractInfo
     }
 
     /**
+     * Get EMV string for QR code.
+     *
      * @return string
      * @throws LocalizedException
      */
-    public function getEmv(): string
+    public function getEmv()
     {
         $payment = $this->getInfo();
-        return (string) $payment->getAdditionalInformation('qr_code_emv');
+        $emv = $payment->getAdditionalInformation('qr_code_emv');
+        return (string) $emv;
     }
 
     /**
+     * Get QR code image URL.
+     *
      * @return string
      * @throws LocalizedException
      */
-    public function getQRCodeImage(): string
+    public function getQRCodeImage()
     {
         $payment = $this->getInfo();
-        return (string) $payment->getAdditionalInformation('qr_code_url');
+        $qrCodeUrl = $payment->getAdditionalInformation('qr_code_url');
+        return (string) $qrCodeUrl;
     }
 }

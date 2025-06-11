@@ -52,8 +52,8 @@ class PaymentLinkSuccess extends Template
         PaymentLinkService $paymentLinkService,
         FormKey $formKey,
         Helper $helper,
-        array $data = [])
-    {
+        array $data = []
+    ) {
         $this->paymentLinkService = $paymentLinkService;
         $this->formKey = $formKey;
         $this->helper = $helper;

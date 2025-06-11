@@ -29,34 +29,36 @@ class Success implements HttpGetActionInterface
     /**
      * @var PageFactory
      */
-    protected PageFactory $resultPageFactory;
+    protected $resultPageFactory;
 
     /**
      * @var PaymentLinkService
      */
-    private PaymentLinkService $paymentLinkService;
+    private $paymentLinkService;
 
     /**
      * @var RequestInterface
      */
-    private RequestInterface $request;
+    private $request;
 
     /**
      * @var RedirectFactory
      */
-    private RedirectFactory $redirectFactory;
+    private $redirectFactory;
 
     /**
      * @var Data
      */
-    private Data $helperData;
+    private $helperData;
 
     /**
      * @var ManagerInterface
      */
-    private ManagerInterface $messageManager;
+    private $messageManager;
 
     /**
+     * Success constructor.
+     *
      * @param PageFactory $resultPageFactory
      * @param PaymentLinkService $paymentLinkService
      * @param RequestInterface $request
@@ -71,8 +73,7 @@ class Success implements HttpGetActionInterface
         RedirectFactory $redirectFactory,
         Data $helperData,
         ManagerInterface $messageManager
-    )
-    {
+    ) {
         $this->resultPageFactory = $resultPageFactory;
         $this->paymentLinkService = $paymentLinkService;
         $this->request = $request;
@@ -109,7 +110,8 @@ class Success implements HttpGetActionInterface
             $order = $this->paymentLinkService->getOrderByOrderId($orderId);
             $orderStatus = $order->getStatus();
             $configStatus = $this->helperData->getConfig('order_status', $order->getPayment()->getMethod());
-            $isCcMethod = str_contains($order->getPayment()->getMethod(), 'cc');
+
+            $isCcMethod = strpos($order->getPayment()->getMethod(), 'cc') !== false;
 
             if (!$isCcMethod && $orderStatus !== $configStatus) {
                 return $this->redirectFactory->create()->setPath('/');

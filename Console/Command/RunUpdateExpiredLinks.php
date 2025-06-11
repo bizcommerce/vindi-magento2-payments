@@ -15,17 +15,24 @@ class RunUpdateExpiredLinks extends Command
     /**
      * @var UpdateExpiredLinks
      */
-    private UpdateExpiredLinks $updateExpiredLinks;
+    private $updateExpiredLinks;
 
     /**
+     * @var string|null
+     */
+    private $name;
+
+    /**
+     * Constructor.
+     *
      * @param UpdateExpiredLinks $updateExpiredLinks
      * @param string|null $name
      */
-    public function __construct(
-        UpdateExpiredLinks $updateExpiredLinks,
-        string $name = null
-    ) {
+    public function __construct(UpdateExpiredLinks $updateExpiredLinks, $name = null)
+    {
         $this->updateExpiredLinks = $updateExpiredLinks;
+        $this->name = $name;
+
         parent::__construct($name);
     }
 
@@ -46,7 +53,7 @@ class RunUpdateExpiredLinks extends Command
      * @param OutputInterface $output
      * @return int
      */
-    protected function execute(InputInterface $input, OutputInterface $output): int
+    protected function execute(InputInterface $input, OutputInterface $output)
     {
         try {
             $this->updateExpiredLinks->execute();

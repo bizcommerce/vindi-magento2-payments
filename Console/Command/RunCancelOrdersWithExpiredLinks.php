@@ -15,12 +15,12 @@ class RunCancelOrdersWithExpiredLinks extends Command
     /**
      * @var CancelOrdersWithExpiredLinks
      */
-    private CancelOrdersWithExpiredLinks $cancelOrdersWithExpiredLinks;
+    private $cancelOrdersWithExpiredLinks;
 
     /**
      * @var LoggerInterface
      */
-    private LoggerInterface $logger;
+    private $logger;
 
     /**
      * @param CancelOrdersWithExpiredLinks $cancelOrdersWithExpiredLinks
@@ -52,7 +52,7 @@ class RunCancelOrdersWithExpiredLinks extends Command
      * @param OutputInterface $output
      * @return int
      */
-    protected function execute(InputInterface $input, OutputInterface $output): int
+    protected function execute(InputInterface $input, OutputInterface $output)
     {
         try {
             $this->cancelOrdersWithExpiredLinks->execute();

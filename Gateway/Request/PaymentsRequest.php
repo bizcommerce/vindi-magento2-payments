@@ -121,7 +121,7 @@ class PaymentsRequest
      * @param Order $order
      * @return array
      */
-    protected function getPaymentMethod(Order $order): array
+    protected function getPaymentMethod(Order $order)
     {
         return [
             'payment_method_id' => $this->helper->getMethodId('PIX'),
@@ -136,7 +136,7 @@ class PaymentsRequest
      * @param float $amount
      * @return array
      */
-    protected function getTransaction(Order $order, float $amount): array
+    protected function getTransaction(Order $order, float $amount)
     {
         $transaction = [
             'token_account'        => $this->helper->getToken($order->getStoreId()),
@@ -159,7 +159,7 @@ class PaymentsRequest
      * @param float $orderAmount
      * @return array
      */
-    protected function getTransactionInfo(Order $order, float $orderAmount): array
+    protected function getTransactionInfo(Order $order, float $orderAmount)
     {
         $shippingDescription = $order->getShippingDescription();
         $shippingType        = $shippingDescription ?: 'SEM_FRETE';
@@ -188,7 +188,7 @@ class PaymentsRequest
      * @param float $orderAmount
      * @return float
      */
-    public function getDiscountAmount(Order $order, $orderAmount): float
+    public function getDiscountAmount(Order $order, $orderAmount)
     {
         $discountAmount   = (float)$order->getDiscountAmount();
         $transactionTotal = $order->getBaseSubtotal() + $order->getShippingAmount() + $discountAmount;
@@ -205,7 +205,7 @@ class PaymentsRequest
      * @param float $orderAmount
      * @return float
      */
-    protected function getPriceAdditional(Order $order, float $orderAmount): float
+    protected function getPriceAdditional(Order $order, float $orderAmount)
     {
         $transactionTotal = $order->getBaseSubtotal() + $order->getShippingAmount() + $order->getDiscountAmount();
         if ($transactionTotal < $orderAmount) {
@@ -220,7 +220,7 @@ class PaymentsRequest
      * @param Order $order
      * @return array
      */
-    public function getCustomerData(Order $order): array
+    public function getCustomerData(Order $order)
     {
         $address             = $order->getBillingAddress();
         $customerTaxVat      = $address->getVatId() ?: $order->getCustomerTaxvat();
@@ -253,7 +253,7 @@ class PaymentsRequest
      * @param Order $order
      * @return array
      */
-    protected function getAddresses($order): array
+    protected function getAddresses($order)
     {
         $addresses      = [];
         $billingAddress = $order->getBillingAddress();
@@ -291,7 +291,7 @@ class PaymentsRequest
      * @param string $config
      * @return int
      */
-    public function getStreetField(string $config): int
+    public function getStreetField(string $config)
     {
         return (int)$this->helper->getConfig($config, 'address', 'vindi_vp') + 1;
     }
@@ -302,7 +302,7 @@ class PaymentsRequest
      * @param Order $order
      * @return array
      */
-    protected function getItemsData(Order $order): array
+    protected function getItemsData(Order $order)
     {
         $items = [];
         foreach ($order->getAllItems() as $quoteItem) {

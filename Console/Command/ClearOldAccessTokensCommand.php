@@ -15,7 +15,7 @@ class ClearOldAccessTokensCommand extends Command
     /**
      * @var ClearOldAccessTokens
      */
-    private ClearOldAccessTokens $clearOldAccessTokens;
+    private $clearOldAccessTokens;
 
     /**
      * Constructor.
@@ -45,7 +45,7 @@ class ClearOldAccessTokensCommand extends Command
      * @param OutputInterface $output
      * @return int
      */
-    protected function execute(InputInterface $input, OutputInterface $output): int
+    protected function execute(InputInterface $input, OutputInterface $output)
     {
         $output->writeln('<info>Starting expired access tokens clearance...</info>');
 

@@ -8,15 +8,10 @@ use Magento\Framework\Data\Form\Element\AbstractElement;
 use Vindi\VP\Helper\Data as HelperData;
 
 /**
- *
- * DISCLAIMER
- *
- * Do not edit or add to this file if you wish to upgrade this extension to newer
- * version in the future.
+ * Class AuthenticateButton
  *
  * @category    Vindi
  * @package     Vindi_VP
- *
  */
 class AuthenticateButton extends Field
 {
@@ -31,7 +26,7 @@ class AuthenticateButton extends Field
     protected $helperData;
 
     /**
-     * AuthenticateButton constructor.
+     * Constructor
      *
      * @param Context $context
      * @param HelperData $helperData
@@ -47,7 +42,7 @@ class AuthenticateButton extends Field
     }
 
     /**
-     * Render fieldset html
+     * Render fieldset HTML
      *
      * @param AbstractElement $element
      * @return string
@@ -57,6 +52,7 @@ class AuthenticateButton extends Field
         $element->unsScope()
             ->unsCanUseWebsiteValue()
             ->unsCanUseDefaultValue();
+
         return parent::render($element);
     }
 
@@ -69,14 +65,19 @@ class AuthenticateButton extends Field
     {
         $storeId = $this->_request->getParam('store');
         $consumerKey = $this->helperData->getConsumerKey($storeId);
-        $isSandbox = $this->_scopeConfig->getValue('vindi_vp/general/use_sandbox', \Magento\Store\Model\ScopeInterface::SCOPE_STORE, $storeId);
+
+        $isSandbox = $this->_scopeConfig->getValue(
+            'vindi_vp/general/use_sandbox',
+            \Magento\Store\Model\ScopeInterface::SCOPE_STORE,
+            $storeId
+        );
 
         if (empty($consumerKey)) {
             return null;
         }
 
         $baseUrl = $isSandbox
-                ? 'https://tc-intermediador-sandbox.yapay.com.br/authentication'
+            ? 'https://tc-intermediador-sandbox.yapay.com.br/authentication'
             : 'https://tc.intermediador.yapay.com.br/authentication';
 
         return $baseUrl . '?consumer_key=' . urlencode($consumerKey);
@@ -94,11 +95,14 @@ class AuthenticateButton extends Field
             return '<p style="color: red;">' . __('Please configure the Consumer Key before proceeding.') . '</p>';
         }
 
-        $button = $this->getLayout()->createBlock('Magento\Backend\Block\Widget\Button')->setData([
-            'id' => 'auth_button',
-            'label' => __('Authenticate Application'),
-            'onclick' => "window.open('$url', '_blank')",
-        ]);
+        /** @var \Magento\Backend\Block\Widget\Button $button */
+        $button = $this->getLayout()
+            ->createBlock('Magento\Backend\Block\Widget\Button')
+            ->setData([
+                'id' => 'auth_button',
+                'label' => __('Authenticate Application'),
+                'onclick' => "window.open('$url', '_blank')",
+            ]);
 
         return $button->toHtml();
     }

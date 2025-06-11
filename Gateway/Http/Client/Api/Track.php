@@ -21,11 +21,12 @@ class Track extends Client
     public const LOG_NAME = 'vindi-track';
 
     /**
-     * @param $data
-     * @param $orderId
+     *
+     * @param array $data
+     * @param int|null $storeId
      * @return array
      */
-    public function execute($data, $storeId = null): array
+    public function execute(array $data, $storeId = null)
     {
         $path = $this->getEndpointPath('payments/track');
         $method = Request::METHOD_POST;

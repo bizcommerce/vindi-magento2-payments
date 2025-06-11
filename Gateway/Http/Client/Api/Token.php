@@ -10,7 +10,6 @@
  * @category    Vindi
  * @package     Vindi_VP
  *
- *
  */
 
 namespace Vindi\VP\Gateway\Http\Client\Api;
@@ -21,13 +20,14 @@ use Laminas\Http\Request;
 class Token extends Client
 {
     /**
+     *
      * @param string $accessToken
      * @param string $refreshToken
-     * @param $storeId
+     * @param int|null $storeId
      * @return string
      * @throws \Exception
      */
-    public function updateAccessToken(string $accessToken, string $refreshToken, $storeId = null): array
+    public function updateAccessToken($accessToken, $refreshToken, $storeId = null)
     {
         $data = [
             'access_token' => $accessToken,
@@ -49,21 +49,22 @@ class Token extends Client
     }
 
     /**
+     *
      * @param string $resellerToken
      * @param string $tokenAccount
      * @param string $consumerKey
      * @param string $consumerSecret
-     * @param $storeId
+     * @param int|null $storeId
      * @return string
      * @throws \Exception
      */
     public function generateCode(
-        string $resellerToken,
-        string $tokenAccount,
-        string $consumerKey,
-        string $consumerSecret,
+        $resellerToken,
+        $tokenAccount,
+        $consumerKey,
+        $consumerSecret,
         $storeId = null
-    ): string {
+    ) {
         $data = [
             'reseller_token' => $resellerToken,
             'token_account' => $tokenAccount,
@@ -88,19 +89,20 @@ class Token extends Client
     }
 
     /**
+     *
      * @param string $code
      * @param string $consumerKey
      * @param string $consumerSecret
-     * @param $storeId
-     * @return array
+     * @param int|null $storeId
+     * @return string
      * @throws \Exception
      */
     public function generateAccessToken(
-        string $code,
-        string $consumerKey,
-        string $consumerSecret,
+        $code,
+        $consumerKey,
+        $consumerSecret,
         $storeId = null
-    ): array {
+    ) {
         $data = [
             'consumer_key' => $consumerKey,
             'consumer_secret' => $consumerSecret,

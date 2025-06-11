@@ -1,20 +1,12 @@
 <?php
 /**
- *
- *
- *
- *
- *
- *
  * DISCLAIMER
  *
- * Do not edit or add to this file if you wish to upgrade this extension to newer
+ * Do not edit or add to this file if you wish to upgrade this extension to a newer
  * version in the future.
  *
  * @category    Vindi
  * @package     Vindi_VP
- *
- *
  */
 
 namespace Vindi\VP\Gateway\Http;
@@ -31,6 +23,7 @@ class TransferFactory implements TransferFactoryInterface
     private $transferBuilder;
 
     /**
+     *
      * @param TransferBuilder $transferBuilder
      */
     public function __construct(
@@ -47,10 +40,14 @@ class TransferFactory implements TransferFactoryInterface
      */
     public function create(array $request)
     {
-        $this->transferBuilder->setBody($request['request']);
+        if (isset($request['request'])) {
+            $this->transferBuilder->setBody($request['request']);
+        }
+
         if (isset($request['client_config'])) {
             $this->transferBuilder->setClientConfig($request['client_config']);
         }
+
         return $this->transferBuilder->build();
     }
 }

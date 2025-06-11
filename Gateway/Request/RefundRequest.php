@@ -63,7 +63,7 @@ class RefundRequest implements BuilderInterface
      * @return array
      * @throws \Magento\Framework\Exception\LocalizedException
      */
-    public function build(array $buildSubject)
+    public function build($buildSubject)
     {
         $this->logDebug('RefundRequest: Starting build process.');
 
@@ -140,7 +140,7 @@ class RefundRequest implements BuilderInterface
      * @param array|string $data
      * @param string $type
      */
-    private function logDebug(string $message, $data = [], string $type = 'info'): void
+    private function logDebug($message, $data = [], string $type = 'info')
     {
         if ($this->isDebugEnabled) {
             if ($type === 'error') {

@@ -32,7 +32,7 @@ class Client
     protected $helperConfig;
 
     /**
-     * @var HttpClient
+     * @var HttpClient|null
      */
     protected $api;
 
@@ -47,12 +47,13 @@ class Client
     protected $json;
 
     /**
-     * @var string
+     * @var string|null
      */
     protected $token;
 
-
     /**
+     * Client constructor.
+     *
      * @param Config $helperConfig
      * @param EncryptorInterface $encryptor
      * @param Json $json
@@ -68,9 +69,10 @@ class Client
     }
 
     /**
+     *
      * @return string[]
      */
-    protected function getDefaultHeaders(): array
+    protected function getDefaultHeaders()
     {
         return [
             'Content-Type' => 'application/json'
@@ -78,9 +80,10 @@ class Client
     }
 
     /**
+     *
      * @return array
      */
-    protected function getDefaultOptions(): array
+    protected function getDefaultOptions()
     {
         return [
             'timeout' => 30
@@ -88,13 +91,16 @@ class Client
     }
 
     /**
+     *
      * @param string $endpoint
-     * @param string $orderId
+     * @param string|null $orderId
+     * @param string|null $token
      * @return string
      */
-    public function getEndpointPath($endpoint, $orderId = null, $token = null): string
+    public function getEndpointPath($endpoint, $orderId = null, $token = null)
     {
         $fullEndpoint = $this->helperConfig->getEndpointConfig($endpoint);
+
         return str_replace(
             ['{order_id}', '{token}'],
             [$orderId, $token],
@@ -102,7 +108,14 @@ class Client
         );
     }
 
-    public function getApi($path, $type = 'payments', $storeId = null): HttpClient
+    /**
+     *
+     * @param string $path
+     * @param string $type
+     * @param int|null $storeId
+     * @return HttpClient
+     */
+    public function getApi($path, $type = 'payments', $storeId = null)
     {
         $uri = $this->helperConfig->getEndpointConfig($type . '_uri');
 
@@ -122,27 +135,34 @@ class Client
     }
 
     /**
+     *
      * @param string $path
      * @param string $method
+     * @param string $type
      * @param array|object $data
      * @param int|null $storeId
+     * @param string $responseType
      * @return array
      */
     protected function makeRequest(
         string $path,
         string $method,
-        $type = 'auth',
-        $data = [],
-        $storeId = null,
-        $responseType = 'json'
-    ): array {
+               $type = 'auth',
+               $data = [],
+               $storeId = null,
+               $responseType = 'json'
+    ) {
         $api = $this->getApi($path, $type, $storeId);
         $api->setMethod($method);
+
         if (!empty($data)) {
             $api->setRawBody($this->json->serialize($data));
         }
+
         $response = $api->send();
+
         $content = $response->getBody();
+
         if ($content && $response->getStatusCode() != 204) {
             if ($responseType == 'xml') {
                 $content = simplexml_load_string($content);

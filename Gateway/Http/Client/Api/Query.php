@@ -9,7 +9,6 @@
  *
  * @category    Vindi
  * @package     Vindi_VP
- *
  */
 
 namespace Vindi\VP\Gateway\Http\Client\Api;
@@ -19,7 +18,14 @@ use Laminas\Http\Request;
 
 class Query extends Client
 {
-    public function execute(string $orderId, string $token, $storeId = null): array
+    /**
+     *
+     * @param string $orderId
+     * @param string $token
+     * @param int|null $storeId
+     * @return array
+     */
+    public function execute($orderId, $token, $storeId = null)
     {
         $path = $this->getEndpointPath('payments/get', $orderId, $token);
         $method = Request::METHOD_GET;

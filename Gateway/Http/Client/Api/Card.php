@@ -24,7 +24,7 @@ class Card extends Client
      * @param int|null $storeId
      * @return array
      */
-    public function create(array $data, $storeId = null): array
+    public function create(array $data, $storeId = null)
     {
         $path = $this->getEndpointPath('card/create');
         $method = Request::METHOD_POST;
@@ -38,7 +38,7 @@ class Card extends Client
      * @param int|null $storeId
      * @return array
      */
-    public function retrieve(array $data, $storeId = null): array
+    public function retrieve(array $data, $storeId = null)
     {
         $path = $this->getEndpointPath('card/get');
         $method = Request::METHOD_POST;
@@ -52,7 +52,7 @@ class Card extends Client
      * @param int|null $storeId
      * @return array
      */
-    public function deactivate(array $data, $storeId = null): array
+    public function deactivate(array $data, $storeId = null)
     {
         $path = $this->getEndpointPath('card/delete');
         $method = Request::METHOD_POST;

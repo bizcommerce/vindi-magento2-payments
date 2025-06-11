@@ -2,7 +2,6 @@
 /**
  *
  *
- *
  * @category    Vindi
  * @package     Vindi_VP
  */
@@ -56,7 +55,7 @@ abstract class Callback extends Action implements \Magento\Framework\App\CsrfAwa
     protected $json;
 
     /**
-     * @var string
+     * @var string|array
      */
     protected $requestContent;
 
@@ -73,13 +72,15 @@ abstract class Callback extends Action implements \Magento\Framework\App\CsrfAwa
     protected $eventManager;
 
     /**
-     * PostBack constructor.
+     * Callback constructor.
+     *
      * @param Context $context
      * @param Json $json
      * @param ResultFactory $resultFactory
      * @param HelperData $helperData
      * @param HelperOrder $helperOrder
      * @param CallbackResourceModel $callbackResourceModel
+     * @param CallbackFactory $callbackFactory
      * @param ManagerInterface $eventManager
      */
     public function __construct(
@@ -110,9 +111,9 @@ abstract class Callback extends Action implements \Magento\Framework\App\CsrfAwa
     abstract public function execute();
 
     /**
-     * @param $result
-     * @param $content
-     * @param $params
+     * @param mixed $result
+     * @param mixed $content
+     * @param mixed $params
      * @return mixed
      */
     public function dispatchEvent($result, $content, $params)
@@ -130,21 +131,21 @@ abstract class Callback extends Action implements \Magento\Framework\App\CsrfAwa
     }
 
     /**
-     * @inheritDoc
+     * @param RequestInterface $request
+     * @return InvalidRequestException|null
      */
-    public function createCsrfValidationException(RequestInterface $request): ?InvalidRequestException
+    public function createCsrfValidationException(RequestInterface $request)
     {
         $result = $this->resultFactory->create(ResultFactory::TYPE_RAW);
         $result->setHttpResponseCode(403);
-        return new InvalidRequestException(
-            $result
-        );
+        return new InvalidRequestException($result);
     }
 
     /**
-     * @inheritDoc
+     * @param RequestInterface $request
+     * @return bool|null
      */
-    public function validateForCsrf(RequestInterface $request): ?bool
+    public function validateForCsrf(RequestInterface $request)
     {
         $hash = $request->getParam('hash');
         $storeHash = sha1($this->helperData->getGeneralConfig('app_key'));
@@ -153,7 +154,7 @@ abstract class Callback extends Action implements \Magento\Framework\App\CsrfAwa
 
     /**
      * @param RequestInterface $request
-     * @return mixed|string
+     * @return array|string
      */
     protected function getContent(RequestInterface $request)
     {
@@ -170,8 +171,9 @@ abstract class Callback extends Action implements \Magento\Framework\App\CsrfAwa
     }
 
     /**
-     * @param $content
-     * @param $params
+     * @param mixed $content
+     * @param mixed $params
+     * @return void
      */
     protected function logParams($content, $params)
     {

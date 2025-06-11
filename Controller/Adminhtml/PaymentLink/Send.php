@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 /**
- *
  * DISCLAIMER
  *
  * Do not edit or add to this file if you wish to upgrade this extension to newer
@@ -11,8 +10,6 @@ declare(strict_types=1);
  *
  * @category    Vindi
  * @package     Vindi_VP
- *
- *
  */
 
 namespace Vindi\VP\Controller\Adminhtml\PaymentLink;
@@ -31,22 +28,27 @@ class Send extends Action implements HttpPostActionInterface
     /**
      * @var JsonFactory
      */
-    private JsonFactory $resultJsonFactory;
+    private $resultJsonFactory;
 
     /**
      * @var PaymentLinkService
      */
-    private PaymentLinkService $paymentLinkService;
+    private $paymentLinkService;
 
     /**
      * @var LoggerInterface
      */
-    private LoggerInterface $logger;
+    private $logger;
 
     /**
      * @var Validator
      */
-    private Validator $formKeyValidator;
+    private $formKeyValidator;
+
+    /**
+     * @var ManagerInterface
+     */
+    private $messageManager;
 
     /**
      * @param Context $context
@@ -73,7 +75,6 @@ class Send extends Action implements HttpPostActionInterface
     }
 
     /**
-     *
      * @return \Magento\Framework\Controller\Result\Json
      */
     public function execute()
@@ -88,7 +89,7 @@ class Send extends Action implements HttpPostActionInterface
         }
 
         try {
-            if ($orderId){
+            if ($orderId) {
                 $response['success'] = $this->paymentLinkService->sendPaymentLinkEmail($orderId);
             }
 

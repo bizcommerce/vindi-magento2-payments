@@ -19,9 +19,16 @@ class Index extends AbstractAccount
      */
     protected $resultPageFactory;
 
+    /**
+     * Index constructor.
+     *
+     * @param Context     $context
+     * @param Session     $customerSession
+     * @param PageFactory $resultPageFactory
+     */
     public function __construct(
-        Context     $context,
-        Session     $customerSession,
+        Context $context,
+        Session $customerSession,
         PageFactory $resultPageFactory
     ) {
         parent::__construct($context, $customerSession);
@@ -29,6 +36,8 @@ class Index extends AbstractAccount
     }
 
     /**
+     * Execute method.
+     *
      * @return ResultInterface
      */
     public function execute()

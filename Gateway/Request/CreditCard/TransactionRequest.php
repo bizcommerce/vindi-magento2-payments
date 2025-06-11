@@ -35,48 +35,12 @@ use Magento\Framework\Exception\LocalizedException;
  */
 class TransactionRequest extends PaymentsRequest implements BuilderInterface
 {
-    /**
-     * @var EncryptorInterface
-     */
     protected $encryptor;
-
-    /**
-     * @var SessionManagerInterface
-     */
     protected $session;
-
-    /**
-     * @var CreditCardRepository
-     */
     protected $creditCardRepository;
-
-    /**
-     * @var CustomerSession
-     */
     protected $customerSession;
-
-    /**
-     * @var CreditCardCollectionFactory
-     */
     protected $creditCardCollectionFactory;
 
-    /**
-     * TransactionRequest constructor.
-     *
-     * @param ManagerInterface              $eventManager
-     * @param Data                          $helper
-     * @param DateTime                      $date
-     * @param ConfigInterface               $config
-     * @param CustomerSession               $customerSession
-     * @param DateTime                      $dateTime
-     * @param ProductRepositoryInterface    $productRepository
-     * @param CategoryRepositoryInterface   $categoryRepository
-     * @param Api                           $api
-     * @param EncryptorInterface            $encryptor
-     * @param SessionManagerInterface       $session
-     * @param CreditCardRepository          $creditCardRepository
-     * @param CreditCardCollectionFactory   $creditCardCollectionFactory
-     */
     public function __construct(
         ManagerInterface $eventManager,
         Data $helper,
@@ -114,7 +78,7 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
      * @return array
      * @throws LocalizedException
      */
-    public function build(array $buildSubject): array
+    public function build(array $buildSubject)
     {
         if (!isset($buildSubject['payment'])
             || !$buildSubject['payment'] instanceof PaymentDataObjectInterface
@@ -142,7 +106,7 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
      * @param \Magento\Sales\Model\Order\Payment $payment
      * @return array
      */
-    protected function getPaymentData($payment): array
+    protected function getPaymentData($payment)
     {
         $paymentProfileId = $payment->getAdditionalInformation('payment_profile');
 
@@ -156,12 +120,12 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
     /**
      * Retrieves saved credit card data
      *
-     * @param string                             $paymentProfileId
+     * @param string $paymentProfileId
      * @param \Magento\Sales\Model\Order\Payment $payment
      * @return array
      * @throws LocalizedException
      */
-    protected function getSavedCardData(string $paymentProfileId, $payment): array
+    protected function getSavedCardData($paymentProfileId, $payment)
     {
         $customerId = $this->customerSession->getCustomerId();
 
@@ -200,7 +164,7 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
      * @param \Magento\Sales\Model\Order\Payment $payment
      * @return array
      */
-    protected function getNewCardData($payment): array
+    protected function getNewCardData($payment)
     {
         $order = $payment->getOrder();
         $saveCard = $payment->getAdditionalInformation('save_card');
@@ -231,7 +195,7 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
      * @param \Magento\Sales\Model\Order $entity
      * @return int
      */
-    protected function getInstallments($entity): int
+    protected function getInstallments($entity)
     {
         $installments = $entity->getPayment()->getAdditionalInformation('cc_installments');
         return (int)$installments ?: 1;

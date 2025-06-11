@@ -52,7 +52,7 @@ class BankSlipPix extends AbstractInfo
     protected $priceCurrency;
 
     /**
-     * BankSlip constructor.
+     * BankSlipPix constructor.
      * @param Context $context
      * @param ConfigInterface $config
      * @param Config $paymentConfig

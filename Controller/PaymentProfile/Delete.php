@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Vindi\VP\Controller\PaymentProfile;
@@ -6,7 +7,6 @@ namespace Vindi\VP\Controller\PaymentProfile;
 use Magento\Customer\Model\Session;
 use Magento\Framework\App\Action\Action;
 use Magento\Framework\App\Action\Context;
-use Magento\Framework\App\ResponseInterface;
 use Magento\Framework\Exception\NotFoundException;
 use Vindi\VP\Model\ResourceModel\CreditCard as CreditCardResource;
 use Vindi\VP\Model\CreditCardFactory;
@@ -39,6 +39,8 @@ class Delete extends Action
     protected $customerRepository;
 
     /**
+     * Delete constructor.
+     *
      * @param Context $context
      * @param Session $customerSession
      * @param CreditCardFactory $creditCardFactory
@@ -53,16 +55,16 @@ class Delete extends Action
         CustomerRepositoryInterface $customerRepository
     ) {
         parent::__construct($context);
-        $this->customerSession    = $customerSession;
-        $this->creditCardFactory  = $creditCardFactory;
+        $this->customerSession = $customerSession;
+        $this->creditCardFactory = $creditCardFactory;
         $this->creditCardResource = $creditCardResource;
         $this->customerRepository = $customerRepository;
     }
 
     /**
-     * Execute the action
+     * Execute the action.
      *
-     * @return ResponseInterface
+     * @return \Magento\Framework\Controller\Result\Redirect
      * @throws NotFoundException
      */
     public function execute()

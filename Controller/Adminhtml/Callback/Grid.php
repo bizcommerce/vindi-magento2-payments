@@ -1,11 +1,6 @@
 <?php
 /**
  *
- *
- *
- *
- *
- *
  * DISCLAIMER
  *
  * Do not edit or add to this file if you wish to upgrade this extension to newer
@@ -13,8 +8,6 @@
  *
  * @category    Vindi
  * @package     Vindi_VP
- *
- *
  */
 
 namespace Vindi\VP\Controller\Adminhtml\Callback;
@@ -40,15 +33,14 @@ class Grid extends Action implements HttpGetActionInterface
     /**
      * Constructor
      *
-     * @param \Magento\Backend\App\Action\Context $context
-     * @param \Magento\Framework\View\Result\PageFactory $rawFactory
+     * @param Context $context
+     * @param PageFactory $rawFactory
      */
     public function __construct(
         Context $context,
         PageFactory $rawFactory
     ) {
         $this->pageFactory = $rawFactory;
-
         parent::__construct($context);
     }
 
@@ -57,7 +49,7 @@ class Grid extends Action implements HttpGetActionInterface
      *
      * @return Page
      */
-    public function execute(): Page
+    public function execute()
     {
         $resultPage = $this->pageFactory->create();
         $resultPage->setActiveMenu('Vindi_VP::callbacks');

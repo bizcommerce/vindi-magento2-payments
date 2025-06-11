@@ -11,6 +11,7 @@ use Vindi\VP\Logger\Logger;
 use Magento\Framework\App\ResponseInterface;
 use Vindi\VP\Helper\Data as HelperData;
 use Magento\Framework\App\Cache\Manager as CacheManager;
+use Magento\Framework\Controller\ResultInterface;
 
 class Index extends Action
 {
@@ -68,7 +69,7 @@ class Index extends Action
     /**
      * Execute the controller logic
      *
-     * @return ResponseInterface|\Magento\Framework\Controller\ResultInterface
+     * @return ResponseInterface|ResultInterface
      */
     public function execute()
     {

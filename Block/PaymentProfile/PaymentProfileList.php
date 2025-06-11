@@ -54,15 +54,17 @@ class PaymentProfileList extends Template
     protected function _prepareLayout()
     {
         parent::_prepareLayout();
-        if ($this->getPaymentProfiles()) {
+        $paymentProfiles = $this->getPaymentProfiles();
+        if ($paymentProfiles) {
             $pager = $this->getLayout()->createBlock(
                 'Magento\Theme\Block\Html\Pager',
                 'custom.paymentProfile.list.pager'
-            )->setAvailableLimit([10=>10, 20=>20, 50=>50])->setShowPerPage(true)->setCollection(
-                $this->getPaymentProfiles()
-            );
+            )->setAvailableLimit([10=>10, 20=>20, 50=>50])
+                ->setShowPerPage(true)
+                ->setCollection($paymentProfiles);
+
             $this->setChild('pager', $pager);
-            $this->getPaymentProfiles()->load();
+            $paymentProfiles->load();
         }
         return $this;
     }

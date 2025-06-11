@@ -12,7 +12,6 @@ declare(strict_types=1);
  * @category    Vindi
  * @package     Vindi_VP
  *
- *
  */
 
 namespace Vindi\VP\Block\Custom;
@@ -99,8 +98,8 @@ class PaymentLink extends Template
         CustomerRepositoryInterface $customerRepository,
         PriceHelper $priceHelper,
         TaxConfigProvider $taxConfigProvider,
-        array $data = [])
-    {
+        array $data = []
+    ) {
         $this->paymentLinkService = $paymentLinkService;
         parent::__construct($context, $data);
         $this->configProvider = $configProvider;
@@ -142,7 +141,9 @@ class PaymentLink extends Template
      */
     public function getOrder()
     {
-        return $this->paymentLinkService->getOrderByOrderId($this->getPaymentLink()->getOrderId());
+        return $this->paymentLinkService->getOrderByOrderId(
+            $this->getPaymentLink()->getOrderId()
+        );
     }
 
     /**
@@ -154,11 +155,12 @@ class PaymentLink extends Template
         foreach ($this->configProvider->getIcons() as $index => $icon) {
             $icons[$index] = [
                 'height' => $icon['height'],
-                'title' => $icon['title']->getText(),
-                'url' => $icon['url'],
-                'width' => $icon['width']
+                'title'  => $icon['title']->getText(),
+                'url'    => $icon['url'],
+                'width'  => $icon['width'],
             ];
         }
+
         return json_encode($icons);
     }
 
@@ -182,10 +184,12 @@ class PaymentLink extends Template
     /**
      * @throws NoSuchEntityException
      * @throws LocalizedException
+     * @param int|string $customerId
+     * @return \Magento\Customer\Api\Data\CustomerInterface
      */
-    public function getCustomerById(string|int $customerId)
+    public function getCustomerById($customerId)
     {
-        return $this->customerRepository->getById($customerId);
+        return $this->customerRepository->getById((int) $customerId);
     }
 
     /**
@@ -202,7 +206,12 @@ class PaymentLink extends Template
      */
     public function getInstructions()
     {
-        $method = str_replace('vindi_payment_link_','', $this->getPaymentLink()->getVindiPaymentMethod());
+        $method = str_replace(
+            'vindi_payment_link_',
+            '',
+            $this->getPaymentLink()->getVindiPaymentMethod()
+        );
+
         return $this->helper->getConfig('checkout_instructions', $method);
     }
 
@@ -221,5 +230,4 @@ class PaymentLink extends Template
     {
         return $this->taxConfigProvider->isTaxDisplayedInGrandTotal();
     }
-
 }

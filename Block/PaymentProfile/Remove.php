@@ -8,9 +8,8 @@ use Vindi\VP\Model\Config\Source\CardImages as CardImagesSource;
 use Vindi\VP\Model\ResourceModel\CreditCard\Collection as CreditCardCollection;
 
 /**
- * Class Edit
- * @package Vindi\VP\Block
-
+ * Class Remove
+ * @package Vindi\VP\Block\PaymentProfile
  */
 class Remove extends Template
 {
@@ -29,6 +28,14 @@ class Remove extends Template
      */
     protected $creditCardTypeSource;
 
+    /**
+     * Remove constructor.
+     * @param Context $context
+     * @param CreditCardCollection $paymentProfileCollection
+     * @param CustomerSession $customerSession
+     * @param CardImagesSource $creditCardTypeSource
+     * @param array $data
+     */
     public function __construct(
         Context $context,
         CreditCardCollection $paymentProfileCollection,
@@ -43,18 +50,21 @@ class Remove extends Template
     }
 
     /**
-     * @param $ccType
-     * @return mixed|void
+     * Get credit card image URL by credit card type.
+     *
+     * @param string $ccType
+     * @return string|null
      */
     public function getCreditCardImage($ccType)
     {
         $creditCardOptionArray = $this->creditCardTypeSource->toOptionArray();
 
         foreach ($creditCardOptionArray as $creditCardOption) {
-            if ($creditCardOption['label']->getText() == $ccType) {
+            if ($creditCardOption['label']->getText() === $ccType) {
                 return $creditCardOption['value'];
             }
         }
+        return null;
     }
 
     /**

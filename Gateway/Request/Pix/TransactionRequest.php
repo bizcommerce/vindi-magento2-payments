@@ -8,15 +8,15 @@
  *
  * @category    Vindi
  * @package     Vindi_VP
- *
- *
  */
 
 namespace Vindi\VP\Gateway\Request\Pix;
 
-use Vindi\VP\Gateway\Request\PaymentsRequest;
 use Magento\Payment\Gateway\Data\PaymentDataObjectInterface;
 use Magento\Payment\Gateway\Request\BuilderInterface;
+use Vindi\VP\Gateway\Request\PaymentsRequest;
+use InvalidArgumentException;
+use Magento\Sales\Model\Order\Payment;
 
 class TransactionRequest extends PaymentsRequest implements BuilderInterface
 {
@@ -27,21 +27,24 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
      * @return array
      * @throws \Magento\Framework\Exception\LocalizedException
      */
-    public function build(array $buildSubject)
+    public function build($buildSubject)
     {
-        if (!isset($buildSubject['payment'])
-            || !$buildSubject['payment'] instanceof PaymentDataObjectInterface
-        ) {
-            throw new \InvalidArgumentException('Payment data object should be provided');
+        if (!isset($buildSubject['payment']) || !$buildSubject['payment'] instanceof PaymentDataObjectInterface) {
+            throw new InvalidArgumentException('Payment data object should be provided');
         }
 
-        /** @var \Magento\Sales\Model\Order\Payment $payment */
+        /** @var Payment $payment */
         $payment = $buildSubject['payment']->getPayment();
         $order = $payment->getOrder();
 
         $request = $this->getTransaction($order, $buildSubject['amount']);
         $request['payment'] = $this->getPaymentMethod($order);
 
-        return ['request' => $request, 'client_config' => ['store_id' => $order->getStoreId()]];
+        return [
+            'request' => $request,
+            'client_config' => [
+                'store_id' => $order->getStoreId()
+            ]
+        ];
     }
 }

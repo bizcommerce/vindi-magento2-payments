@@ -30,28 +30,35 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
     public function build(array $buildSubject)
     {
         if (
-            !isset($buildSubject['payment'])
-            || !$buildSubject['payment'] instanceof PaymentDataObjectInterface
+            !isset($buildSubject['payment']) ||
+            !$buildSubject['payment'] instanceof PaymentDataObjectInterface
         ) {
             throw new \InvalidArgumentException('Payment data object should be provided');
         }
 
         /** @var \Magento\Sales\Model\Order\Payment $payment */
         $payment = $buildSubject['payment']->getPayment();
+
         /** @var \Magento\Sales\Model\Order $order */
         $order = $payment->getOrder();
 
         $request = $this->getTransaction($order, $buildSubject['amount']);
         $request['payment'] = $this->getPaymentMethod($order);
 
-        return ['request' => $request, 'client_config' => ['store_id' => $order->getStoreId()]];
+        return [
+            'request' => $request,
+            'client_config' => ['store_id' => $order->getStoreId()]
+        ];
     }
 
-    protected function getPaymentMethod($order): array
+    /**
+     * @param \Magento\Sales\Model\Order $order
+     * @return array
+     */
+    protected function getPaymentMethod($order)
     {
         return [
             'payment_method_id' => $this->helper->getMethodId('BANKSLIPPIX')
         ];
     }
-
 }

@@ -1,35 +1,26 @@
 <?php
 
 /**
- *
- *
- *
- *
- *
- *
  * DISCLAIMER
- *
  * Do not edit or add to this file if you wish to upgrade this extension to newer
  * version in the future.
  *
  * @category    Vindi
  * @package     Vindi_VP
- *
- *
  */
 
 namespace Vindi\VP\Block\Sales\Order\Totals;
 
+use Magento\Framework\View\Element\Template;
 use Magento\Sales\Model\Order;
 
 /**
  * Class Interest
  *
- * @package MercadoPago\Core\Block\Sales\Order\Totals
+ * @package Vindi\VP\Block\Sales\Order\Totals
  */
-class Interest extends \Magento\Framework\View\Element\Template
+class Interest extends Template
 {
-
     /**
      * @var \Magento\Framework\DataObject
      */
@@ -47,16 +38,21 @@ class Interest extends \Magento\Framework\View\Element\Template
 
     /**
      * Add this total to parent
+     *
+     * @return $this
      */
     public function initTotals()
     {
-        if ($this->getSource()->getVindiInterestAmount() > 0) {
+        $source = $this->getSource();
+
+        if ($source->getVindiInterestAmount() > 0) {
             $total = new \Magento\Framework\DataObject([
                 'code'  => 'vindi_interest',
                 'field' => 'vindi_interest_amount',
-                'value' => $this->getSource()->getVindiInterestAmount(),
+                'value' => $source->getVindiInterestAmount(),
                 'label' => __('Interest Rate'),
             ]);
+
             $this->getParentBlock()->addTotalBefore($total, $this->getBeforeCondition());
         }
 
