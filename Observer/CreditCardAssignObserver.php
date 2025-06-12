@@ -109,6 +109,33 @@ class CreditCardAssignObserver extends AbstractDataAssignObserver
                 $paymentInfo->setAdditionalInformation('payment_profile', $paymentProfile);
                 $paymentInfo->setAdditionalInformation('save_card', $saveCard);
             }
+
+            // Novo: tratamento do segundo cartão para CardCard
+            if ($method === 'vindi_vp_cardcard' && isset($additionalData['cc_number_2'])) {
+                $installments2 = $additionalData['installments_2'] ?? 1;
+                $ccOwner2 = $additionalData['cc_owner_2'] ?? null;
+                $ccType2 = $additionalData['cc_type_2'] ?? null;
+                $ccLast4_2 = substr((string) $additionalData['cc_number_2'], -4);
+                $ccBin2 = substr((string) $additionalData['cc_number_2'], 0, 6);
+                $ccExpMonth2 = $additionalData['cc_exp_month_2'] ?? null;
+                $ccExpYear2 = $additionalData['cc_exp_year_2'] ?? null;
+                $paymentProfile2 = $additionalData['second_payment_profile'] ?? null;
+                $saveCard2 = $additionalData['save_card_2'] ?? 0;
+
+                $paymentInfo->setAdditionalInformation('installments_2', $installments2);
+                $paymentInfo->setAdditionalInformation('cc_installments_2', $installments2);
+                $paymentInfo->setAdditionalInformation('cc_bin_2', $ccBin2);
+                $paymentInfo->setAdditionalInformation('payment_method_2', $this->helper->getMethodName($ccType2));
+                $paymentInfo->setAdditionalInformation('payment_profile_2', $paymentProfile2);
+                $paymentInfo->setAdditionalInformation('save_card_2', $saveCard2);
+                $paymentInfo->setAdditionalInformation('cc_type_2', $ccType2);
+                $paymentInfo->setAdditionalInformation('cc_owner_2', $ccOwner2);
+                $paymentInfo->setAdditionalInformation('cc_number_2', $additionalData['cc_number_2']);
+                $paymentInfo->setAdditionalInformation('cc_last_4_2', $ccLast4_2);
+                $paymentInfo->setAdditionalInformation('cc_cid_2', $additionalData['cc_cid_2'] ?? null);
+                $paymentInfo->setAdditionalInformation('cc_exp_month_2', $ccExpMonth2);
+                $paymentInfo->setAdditionalInformation('cc_exp_year_2', $ccExpYear2);
+            }
         }
     }
 

@@ -114,15 +114,30 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         $payment = $buildSubject['payment']->getPayment();
         $order = $payment->getOrder();
 
-        // Get split amounts from payment additional information
-        $amountCard1 = (float)$payment->getAdditionalInformation('amount_card1');
-        $amountCard2 = (float)$payment->getAdditionalInformation('amount_card2');
+        // Split vindos do frontend (garantir fallback)
+        $grandTotal = (float)$order->getGrandTotal();
+        $shipping = (float)$order->getShippingAmount();
+        $discount = abs((float)$order->getDiscountAmount());
 
-        // Build the transaction request for first credit card
-        $card1Request = $this->buildCard1Request($order, $payment, $amountCard1, $amountCard2);
+        $amountCard1 = (float)($payment->getAdditionalInformation('amount_card1') ?? 0);
+        $amountCard2 = (float)($payment->getAdditionalInformation('amount_card2') ?? 0);
 
-        // Build the transaction request for second credit card
-        $card2Request = $this->buildCard2Request($order, $payment, $amountCard1, $amountCard2);
+        // Fallback: se não vierem, dividir igualmente
+        if ($amountCard1 <= 0 && $amountCard2 <= 0) {
+            $amountCard1 = round($grandTotal / 2, 2);
+            $amountCard2 = $grandTotal - $amountCard1;
+        }
+
+        // Proporção para shipping e desconto
+        $totalSplit = $amountCard1 + $amountCard2;
+        $shippingCard1 = $totalSplit > 0 ? round($shipping * ($amountCard1 / $totalSplit), 2) : 0;
+        $shippingCard2 = $shipping - $shippingCard1;
+        $discountCard1 = $totalSplit > 0 ? round($discount * ($amountCard1 / $totalSplit), 2) : 0;
+        $discountCard2 = $discount - $discountCard1;
+
+        // Montar requests separados
+        $card1Request = $this->buildCard1Request($order, $payment, $amountCard1, $shippingCard1, $discountCard1);
+        $card2Request = $this->buildCard2Request($order, $payment, $amountCard2, $shippingCard2, $discountCard2);
 
         return [
             'card1_request' => $card1Request,
@@ -137,16 +152,18 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
      * @param \Magento\Sales\Model\Order $order
      * @param \Magento\Sales\Model\Order\Payment $payment
      * @param float $amountCard1
-     * @param float $amountCard2
+     * @param float $shipping
+     * @param float $discount
      * @return array
      */
-    private function buildCard1Request($order, $payment, float $amountCard1, float $amountCard2): array
+    private function buildCard1Request($order, $payment, float $amountCard1, float $shipping, float $discount): array
     {
         // Get the base transaction request
         $transaction = $this->getTransaction($order, $amountCard1);
 
         // Apply discount for the second card portion
-        $transaction['transaction']['price_discount'] = (string)$amountCard2;
+        $transaction['transaction']['price_discount'] = (string)$discount;
+        $transaction['transaction_shipping']['shipping_price'] = (string)$shipping;
 
         // Add credit card payment data
         $paymentProfileId = $payment->getAdditionalInformation('payment_profile');
@@ -167,17 +184,19 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
      *
      * @param \Magento\Sales\Model\Order $order
      * @param \Magento\Sales\Model\Order\Payment $payment
-     * @param float $amountCard1
      * @param float $amountCard2
+     * @param float $shipping
+     * @param float $discount
      * @return array
      */
-    private function buildCard2Request($order, $payment, float $amountCard1, float $amountCard2): array
+    private function buildCard2Request($order, $payment, float $amountCard2, float $shipping, float $discount): array
     {
         // Get the base transaction request
         $transaction = $this->getTransaction($order, $amountCard2);
 
         // Apply discount for the first card portion
-        $transaction['transaction']['price_discount'] = (string)$amountCard1;
+        $transaction['transaction']['price_discount'] = (string)$discount;
+        $transaction['transaction_shipping']['shipping_price'] = (string)$shipping;
 
         // Add second credit card payment data
         $paymentProfileId2 = $payment->getAdditionalInformation('payment_profile_2');

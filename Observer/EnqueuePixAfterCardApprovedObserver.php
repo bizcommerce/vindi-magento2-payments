@@ -28,7 +28,8 @@ class EnqueuePixAfterCardApprovedObserver implements ObserverInterface
             return;
         }
         $method = $payment->getMethod();
-        if ($method !== 'cardpix') {
+        // Permitir tanto cardpix quanto cardbankslippix
+        if (!in_array($method, ['cardpix', 'cardbankslippix'])) {
             return;
         }
         // Recupera dados do Pix do payment info
