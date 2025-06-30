@@ -92,35 +92,24 @@ class CardBankSlipPixTransaction implements ClientInterface
     public function placeRequest(TransferInterface $transferObject): array
     {
         $request = $transferObject->getBody();
-
-        // Log the request data with sensitive information masked
         $this->logRequest($request);
-
         $storeId = $request['client_config']['store_id'] ?? null;
 
-        // Process bankslip payment request
-        $bankSlipResponse = $this->processBankSlipPayment($request['bankslip_request'], $storeId);
+        // Process only the card payment (primary transaction)
+        $cardResponse = $this->processCardPayment($request, $storeId);
 
-        // If bankslip payment was successful, process PIX payment
-        if ($this->isSuccessfulBankSlipResponse($bankSlipResponse)) {
-            $pixResponse = $this->processPixPayment($request['pix_request'], $storeId);
-
-            // If PIX payment failed, we need to cancel the bankslip payment
-            if (!$this->isSuccessfulPixResponse($pixResponse)) {
-                $this->cancelBankSlipPayment($bankSlipResponse, $storeId);
-                return ['error' => true, 'bankslip_response' => $bankSlipResponse, 'pix_response' => $pixResponse];
-            }
-
-            // Both transactions were successful
+        if ($this->isSuccessfulCardResponse($cardResponse)) {
             return [
                 'success' => true,
-                'bankslip_response' => $bankSlipResponse,
-                'pix_response' => $pixResponse
+                'transaction' => $cardResponse
             ];
         }
 
-        // BankSlip payment failed, return the error
-        return ['error' => true, 'bankslip_response' => $bankSlipResponse];
+        // Card payment failed
+        return [
+            'error' => true,
+            'transaction' => $cardResponse
+        ];
     }
 
     /**
@@ -275,6 +264,61 @@ class CardBankSlipPixTransaction implements ClientInterface
         return !isset($response['error']) &&
             isset($response['status_id']) &&
             in_array($response['status_id'], ['3', '4']);
+    }
+
+    /**
+     * Process the card payment portion of the transaction
+     *
+     * @param array $request
+     * @param int|null $storeId
+     * @return array
+     */
+    private function processCardPayment(array $request, ?int $storeId): array
+    {
+        try {
+            $url = $this->helper->getApiUrl('payments');
+            $client = $this->clientFactory->create();
+
+            $client->setUri($url);
+            $client->setConfig(['maxredirects' => 0, 'timeout' => 45]);
+            $client->setHeaders(['Content-Type: application/json']);
+            $client->setHeaders('key', $this->helper->getPublicKey($storeId));
+
+            $client->setRawData($this->json->serialize($request), 'application/json');
+            $client->setMethod(\Zend_Http_Client::POST);
+
+            $responseBody = $client->request()->getBody();
+            $response = $this->json->unserialize($responseBody);
+
+            // Log the response
+            $this->logger->debug([
+                'method' => $this->methodCode,
+                'response' => $this->helper->maskSensitiveData($response)
+            ]);
+
+            return $response;
+
+        } catch (\Exception $e) {
+            $this->logger->debug([
+                'method' => $this->methodCode,
+                'error' => $e->getMessage()
+            ]);
+
+            return ['error' => true, 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Check if the card response was successful
+     *
+     * @param array $response
+     * @return bool
+     */
+    private function isSuccessfulCardResponse(array $response): bool
+    {
+        return isset($response['status_id']) &&
+               in_array($response['status_id'], ['3', '4']) &&
+               isset($response['payment']['tid']);
     }
 
     /**

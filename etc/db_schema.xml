@@ -179,4 +179,39 @@
             <column name="entity_id"/>
         </constraint>
     </table>
+
+    <table name="vindi_vp_multi_payment_queue" resource="default" engine="innodb" comment="Vindi VP Multi Payment Queue">
+        <column xsi:type="int" name="entity_id" unsigned="true" nullable="false" identity="true" comment="Entity ID"/>
+        <column xsi:type="int" name="order_id" unsigned="true" nullable="false" comment="Order ID"/>
+        <column xsi:type="varchar" name="increment_id" length="32" nullable="false" comment="Order Increment ID"/>
+        <column xsi:type="varchar" name="payment_method" length="64" nullable="false" comment="Payment Method Code"/>
+        <column xsi:type="varchar" name="primary_transaction_id" length="255" nullable="true" comment="Primary Transaction ID"/>
+        <column xsi:type="varchar" name="secondary_method_type" length="32" nullable="false" comment="Secondary Method Type"/>
+        <column xsi:type="decimal" name="secondary_amount" precision="12" scale="4" unsigned="false" nullable="false" default="0" comment="Secondary Payment Amount"/>
+        <column xsi:type="longtext" name="request_data" nullable="false" comment="Serialized Request Data"/>
+        <column xsi:type="varchar" name="status" length="32" nullable="false" default="pending" comment="Status"/>
+        <column xsi:type="int" name="attempts" unsigned="true" nullable="false" default="0" comment="Processing Attempts"/>
+        <column xsi:type="int" name="max_attempts" unsigned="true" nullable="false" default="3" comment="Maximum Processing Attempts"/>
+        <column xsi:type="timestamp" name="next_attempt_at" nullable="true" comment="Next Attempt Timestamp"/>
+        <column xsi:type="longtext" name="response_data" nullable="true" comment="Serialized Response Data"/>
+        <column xsi:type="text" name="error_message" nullable="true" comment="Error Message"/>
+        <column xsi:type="timestamp" name="created_at" on_update="false" nullable="false" default="CURRENT_TIMESTAMP" comment="Created At"/>
+        <column xsi:type="timestamp" name="updated_at" on_update="true" nullable="false" default="CURRENT_TIMESTAMP" comment="Updated At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="entity_id"/>
+        </constraint>
+        <constraint xsi:type="foreign" referenceId="VINDI_VP_MULTI_PAYMENT_QUEUE_ORDER_ID_SALES_ORDER_ENTITY_ID" table="vindi_vp_multi_payment_queue" column="order_id" referenceTable="sales_order" referenceColumn="entity_id" onDelete="CASCADE"/>
+        <index referenceId="VINDI_VP_MULTI_PAYMENT_QUEUE_ORDER_ID" indexType="btree">
+            <column name="order_id"/>
+        </index>
+        <index referenceId="VINDI_VP_MULTI_PAYMENT_QUEUE_STATUS" indexType="btree">
+            <column name="status"/>
+        </index>
+        <index referenceId="VINDI_VP_MULTI_PAYMENT_QUEUE_PAYMENT_METHOD" indexType="btree">
+            <column name="payment_method"/>
+        </index>
+        <index referenceId="VINDI_VP_MULTI_PAYMENT_QUEUE_NEXT_ATTEMPT_AT" indexType="btree">
+            <column name="next_attempt_at"/>
+        </index>
+    </table>
 </schema>

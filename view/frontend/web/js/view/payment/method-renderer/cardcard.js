@@ -57,9 +57,9 @@ define(
                 template: 'Vindi_VP/payment/form/cardcard',
                 taxvat: (window.checkoutConfig &&
                     window.checkoutConfig.payment &&
-                    window.checkoutConfig.payment.vindi_vp_cardpix &&
-                    window.checkoutConfig.payment.vindi_vp_cardpix.customer_taxvat
-                ) ? window.checkoutConfig.payment.vindi_vp_cardpix.customer_taxvat.replace(/[^0-9]/g, "") : "",
+                    window.checkoutConfig.payment.vindi_vp_cardcard &&
+                    window.checkoutConfig.payment.vindi_vp_cardcard.customer_taxvat
+                ) ? window.checkoutConfig.payment.vindi_vp_cardcard.customer_taxvat.replace(/[^0-9]/g, "") : "",
                 creditCardOwner: '',
                 secondCreditCardOwner: '',
                 creditCardInstallments: '',
@@ -151,51 +151,59 @@ define(
                 });
 
                 this.vindiCreditCardNumber.subscribe(function (value) {
+                    console.log('[CARDCARD] vindiCreditCardNumber.subscribe called with value:', value);
                     if (!value) {
+                        console.log('[CARDCARD] vindiCreditCardNumber - value is empty, returning');
                         return;
                     }
                     var result = cardNumberValidator(value);
+                    console.log('[CARDCARD] cardNumberValidator result:', result);
                     if (!result || !result.isValid) {
+                        console.log('[CARDCARD] cardNumberValidator - result invalid, returning');
                         return;
                     }
                     if (result.card !== null) {
+                        console.log('[CARDCARD] Setting selectedCardType to:', result.card.type);
                         self.selectedCardType(result.card.type);
                     }
                     creditCardData.vindiCreditCardNumber = value;
+                    console.log('[CARDCARD] Setting creditCardType to:', result.card.type);
                     self.creditCardType(result.card.type);
+                    console.log('[CARDCARD] Calling updateInstallmentsValues from subscriber');
                     self.updateInstallmentsValues();
                 });
 
                 this.secondVindiCreditCardNumber.subscribe(function (value) {
+                    console.log('[CARDCARD] secondVindiCreditCardNumber.subscribe called with value:', value);
                     if (!value) {
+                        console.log('[CARDCARD] secondVindiCreditCardNumber - value is empty, returning');
                         return;
                     }
                     var result = cardNumberValidator(value);
+                    console.log('[CARDCARD] secondVindiCreditCardNumber cardNumberValidator result:', result);
                     if (!result || !result.isValid) {
+                        console.log('[CARDCARD] secondVindiCreditCardNumber - result invalid, returning');
                         return;
                     }
                     if (result.card !== null) {
+                        console.log('[CARDCARD] Setting secondSelectedCardType to:', result.card.type);
                         self.secondSelectedCardType(result.card.type);
                     }
+                    console.log('[CARDCARD] Setting secondCreditCardType to:', result.card.type);
                     self.secondCreditCardType(result.card.type);
+                    console.log('[CARDCARD] Calling updateSecondInstallmentsValues from subscriber');
                     self.updateSecondInstallmentsValues();
                 });
 
                 this.selectedPaymentProfile.subscribe(function (value) {
-                    if (value) {
-                        self.showCardData(false);
-                    } else {
-                        self.showCardData(true);
-                    }
+                    // Para cartão salvo, mostrar apenas campos obrigatórios (CVV)
+                    // mas manter o formulário visível
                     self.updateInstallmentsValues();
                 });
 
                 this.secondSelectedPaymentProfile.subscribe(function (value) {
-                    if (value) {
-                        self.showCardData(false);
-                    } else {
-                        self.showCardData(true);
-                    }
+                    // Para segundo cartão salvo, mostrar apenas campos obrigatórios (CVV)
+                    // mas manter o formulário visível
                     self.updateSecondInstallmentsValues();
                 });
 
@@ -414,9 +422,9 @@ define(
                 var grandTotal = 0;
                 if (window.checkoutConfig &&
                     window.checkoutConfig.payment &&
-                    window.checkoutConfig.payment.vindi_vp_cardpix &&
-                    window.checkoutConfig.payment.vindi_vp_cardpix.grand_total) {
-                    grandTotal = parseFloat(window.checkoutConfig.payment.vindi_vp_cardpix.grand_total);
+                    window.checkoutConfig.payment.vindi_vp_cardcard &&
+                    window.checkoutConfig.payment.vindi_vp_cardcard.grand_total) {
+                    grandTotal = parseFloat(window.checkoutConfig.payment.vindi_vp_cardcard.grand_total);
                 }
                 return grandTotal;
             },
@@ -430,7 +438,8 @@ define(
              * @returns {Object}
              */
             getData: function () {
-                fingerprint(window.checkoutConfig.payment[this.getCode()].sandbox);
+                // Inicializar fingerprint de forma segura
+                this.initializeFingerprint();
 
                 var ccExpMonth = '';
                 var ccExpYear = '';
@@ -476,10 +485,41 @@ define(
                         'amount_card2': $('#second_card_amount').val(),
                         'save_card': this.saveCard() ? 1 : 0,
                         'save_card_2': this.secondSaveCard() ? 1 : 0,
-                        'fingerprint': (window.yapay && window.yapay.FingerPrint) ? window.yapay.FingerPrint().getFingerPrint() : '',
-                        'fingerprint_2': (window.yapay && window.yapay.FingerPrint) ? window.yapay.FingerPrint().getFingerPrint() : ''
+                        'fingerprint': this.getFingerprint(),
+                        'fingerprint_2': this.getFingerprint()
                     }
                 };
+            },
+
+            /**
+             * Initialize fingerprint safely
+             */
+            initializeFingerprint: function() {
+                try {
+                    if (window.checkoutConfig && window.checkoutConfig.payment && window.checkoutConfig.payment[this.getCode()]) {
+                        var sandbox = window.checkoutConfig.payment[this.getCode()].sandbox;
+                        if (typeof fingerprint === 'function') {
+                            fingerprint(sandbox);
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Error initializing fingerprint:', e);
+                }
+            },
+
+            /**
+             * Get fingerprint safely
+             * @returns {string}
+             */
+            getFingerprint: function() {
+                try {
+                    if (window.yapay && window.yapay.FingerPrint && typeof window.yapay.FingerPrint().getFingerPrint === 'function') {
+                        return window.yapay.FingerPrint().getFingerPrint();
+                    }
+                } catch (e) {
+                    console.warn('Error getting fingerprint:', e);
+                }
+                return '';
             },
 
             /**
@@ -706,18 +746,26 @@ define(
              */
             updateInstallmentsValues: function () {
                 var self = this;
-                self.installmentsDisabled(true);
 
-                // Mostrar o loader
-                self.isLoadingInstallments(true);
+                console.log('[CARDCARD] updateInstallmentsValues - INÍCIO');
 
+                // Cancel previous request if exists
                 if (self.debounceTimer !== null) {
                     clearTimeout(self.debounceTimer);
+                    console.log('[CARDCARD] Cancelando timer anterior');
                 }
 
+                self.installmentsDisabled(true);
+                self.isLoadingInstallments(true);
+
                 self.debounceTimer = setTimeout(function () {
+                    console.log('[CARDCARD] Timer executado - iniciando verificações');
+
                     var url = self.retrieveInstallmentsUrl();
+                    console.log('[CARDCARD] URL de parcelas:', url);
+
                     if (!url || typeof fetch !== "function") {
+                        console.warn('[CARDCARD] URL não encontrada ou fetch não disponível');
                         self.installmentsDisabled(false);
                         self.isLoadingInstallments(false);
                         return;
@@ -725,28 +773,174 @@ define(
 
                     // Get first card amount value from form
                     var firstCardAmount = parseFloat($('#first_card_amount').val() || 0);
+                    console.log('[CARDCARD] Valor do primeiro cartão:', firstCardAmount);
 
+                    var cardType = self.selectedCardType() || self.creditCardType();
+                    console.log('[CARDCARD] Tipo do cartão (inicial):', cardType);
+                    console.log('[CARDCARD] selectedCardType():', self.selectedCardType());
+                    console.log('[CARDCARD] creditCardType():', self.creditCardType());
+
+                    // FORÇAR DETECÇÃO DO TIPO DO CARTÃO SE NÃO ESTIVER DEFINIDO
+                    if (!cardType) {
+                        console.log('[CARDCARD] Tentando detectar tipo do cartão manualmente...');
+                        var cardNumber = self.vindiCreditCardNumber();
+                        console.log('[CARDCARD] Número do cartão atual:', cardNumber);
+
+                        // Se não há número no observable, tentar pegar do DOM com diferentes seletores
+                        if (!cardNumber) {
+                            // Tentar diferentes seletores para encontrar o campo
+                            var selectors = [
+                                '#' + self.getCode() + '_cc_number',
+                                'input[name="payment[cc_number]"]',
+                                '#vindi_vp_cardcard_cc_number',
+                                '.vindi-cc-number-container input[type="text"]'
+                            ];
+
+                            for (var i = 0; i < selectors.length; i++) {
+                                var $cardField = $(selectors[i]);
+                                console.log('[CARDCARD] Tentando seletor:', selectors[i], 'encontrado:', $cardField.length);
+
+                                if ($cardField.length > 0) {
+                                    cardNumber = $cardField.val();
+                                    console.log('[CARDCARD] Número do cartão encontrado:', cardNumber);
+                                    if (cardNumber) {
+                                        break;
+                                    }
+                                }
+                            }
+
+                            // Se ainda não encontrou, tentar buscar todos os campos de texto na seção
+                            if (!cardNumber) {
+                                console.log('[CARDCARD] Buscando em todos os campos de cartão...');
+                                $('input[type="text"]').each(function() {
+                                    var value = $(this).val();
+                                    var placeholder = $(this).attr('placeholder');
+                                    console.log('[CARDCARD] Campo encontrado:', {
+                                        id: $(this).attr('id'),
+                                        name: $(this).attr('name'),
+                                        placeholder: placeholder,
+                                        value: value ? value.substring(0, 4) + '...' : 'vazio'
+                                    });
+
+                                    // Verificar se é um campo de cartão
+                                    if (placeholder && (placeholder.toLowerCase().includes('cartão') || placeholder.toLowerCase().includes('card')) && value && value.length >= 13) {
+                                        cardNumber = value;
+                                        console.log('[CARDCARD] Número do cartão encontrado por placeholder:', cardNumber.substring(0, 4) + '...');
+                                        return false; // break
+                                    }
+                                });
+                            }
+
+                            // Se encontrou número no DOM, processar manualmente
+                            if (cardNumber) {
+                                console.log('[CARDCARD] Processando número do cartão manualmente:', cardNumber.substring(0, 4) + '...');
+                                var result = cardNumberValidator(cardNumber);
+                                console.log('[CARDCARD] Resultado manual do validator:', result);
+
+                                if (result && result.isValid && result.card) {
+                                    cardType = result.card.type;
+                                    console.log('[CARDCARD] Tipo detectado manualmente:', cardType);
+
+                                    // Atualizar os observables
+                                    self.selectedCardType(cardType);
+                                    self.creditCardType(cardType);
+                                    self.vindiCreditCardNumber(cardNumber);
+
+                                    // Forçar a atualização do binding
+                                    setTimeout(function() {
+                                        if (selectors[0] && $(selectors[0]).length > 0) {
+                                            $(selectors[0]).trigger('change');
+                                        }
+                                    }, 100);
+                                }
+                            }
+                        }
+                    }
+
+                    // If using saved card, get card type from payment profile
+                    if (self.selectedPaymentProfile() && !cardType) {
+                        console.log('[CARDCARD] Usando cartão salvo, ID do perfil:', self.selectedPaymentProfile());
+                        var profiles = self.getPaymentProfiles();
+                        console.log('[CARDCARD] Perfis disponíveis:', profiles);
+
+                        var selectedProfile = profiles.find(function(profile) {
+                            return profile.value == self.selectedPaymentProfile();
+                        });
+                        if (selectedProfile) {
+                            cardType = selectedProfile.card_type;
+                            console.log('[CARDCARD] Tipo do cartão do perfil:', cardType);
+                        }
+                    }
+
+                    console.log('[CARDCARD] Tipo do cartão (final):', cardType);
+
+                    // Skip if no card type selected or amount is 0
+                    if (!cardType || firstCardAmount <= 0) {
+                        console.log('[CARDCARD] Pulando requisição - cardType:', cardType, 'amount:', firstCardAmount);
+                        self.hasInstallments(false);
+                        self.installments([]);
+                        self.installmentsDisabled(true);
+                        self.isLoadingInstallments(false);
+                        return;
+                    }
+
+                    // Map card type to correct format
+                    var mappedCardType = self.mapCardType(cardType);
+                    console.log('[CARDCARD] Tipo do cartão mapeado:', cardType, '->', mappedCardType);
+
+                    var requestBody = {
+                        cc_type: mappedCardType,
+                        payment_link: {
+                            grand_total: firstCardAmount
+                        }
+                    };
+
+                    console.log('[CARDCARD] Fazendo requisição para:', url);
+                    console.log('[CARDCARD] Dados da requisição:', JSON.stringify(requestBody, null, 2));
+
+                    // Use the same structure as CardPix (working)
                     fetch(url, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({
-                            card_type: self.creditCardType(),
-                            amount: firstCardAmount
-                        })
+                        body: JSON.stringify(requestBody)
                     }).then(function (response) {
+                        console.log('[CARDCARD] Resposta recebida - Status:', response.status);
+                        console.log('[CARDCARD] Resposta headers:', response.headers);
+
+                        if (!response.ok) {
+                            throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+                        }
+
                         return response.json();
                     }).then(function (json) {
-                        self.hasInstallments(true);
-                        self.installments(json);
-                        self.installmentsDisabled(false);
+                        console.log('[CARDCARD] Dados recebidos:', json);
+                        console.log('[CARDCARD] Tipo dos dados:', typeof json);
+                        console.log('[CARDCARD] É array?', Array.isArray(json));
+
+                        if (json && Array.isArray(json) && json.length > 0) {
+                            console.log('[CARDCARD] Parcelas encontradas:', json.length);
+                            self.hasInstallments(true);
+                            self.installments(json);
+                            self.installmentsDisabled(false);
+                        } else {
+                            console.log('[CARDCARD] Nenhuma parcela encontrada ou dados inválidos');
+                            self.hasInstallments(false);
+                            self.installments([]);
+                            self.installmentsDisabled(true);
+                        }
                         self.isLoadingInstallments(false);
-                    }).catch(function () {
-                        self.installmentsDisabled(false);
+                        console.log('[CARDCARD] updateInstallmentsValues - SUCESSO');
+                    }).catch(function (error) {
+                        console.error('[CARDCARD] Erro na requisição de parcelas:', error);
+                        console.error('[CARDCARD] Stack trace:', error.stack);
+                        self.hasInstallments(false);
+                        self.installments([]);
+                        self.installmentsDisabled(true);
                         self.isLoadingInstallments(false);
                     });
-                }, 500);
+                }, 800);
             },
 
             /**
@@ -754,18 +948,26 @@ define(
              */
             updateSecondInstallmentsValues: function () {
                 var self = this;
-                self.secondInstallmentsDisabled(true);
 
-                // Mostrar o loader
-                self.isLoadingSecondInstallments(true);
+                console.log('[CARDCARD] updateSecondInstallmentsValues - INÍCIO');
 
+                // Cancel previous request if exists
                 if (self.secondDebounceTimer !== null) {
                     clearTimeout(self.secondDebounceTimer);
+                    console.log('[CARDCARD] Cancelando timer anterior do segundo cartão');
                 }
 
+                self.secondInstallmentsDisabled(true);
+                self.isLoadingSecondInstallments(true);
+
                 self.secondDebounceTimer = setTimeout(function () {
+                    console.log('[CARDCARD] Timer do segundo cartão executado - iniciando verificações');
+
                     var url = self.retrieveInstallmentsUrl();
+                    console.log('[CARDCARD] URL de parcelas (segundo cartão):', url);
+
                     if (!url || typeof fetch !== "function") {
+                        console.warn('[CARDCARD] URL não encontrada ou fetch não disponível (segundo cartão)');
                         self.secondInstallmentsDisabled(false);
                         self.isLoadingSecondInstallments(false);
                         return;
@@ -773,28 +975,97 @@ define(
 
                     // Get second card amount value from form
                     var secondCardAmount = parseFloat($('#second_card_amount').val() || 0);
+                    console.log('[CARDCARD] Valor do segundo cartão:', secondCardAmount);
 
+                    var cardType = self.secondSelectedCardType() || self.secondCreditCardType();
+                    console.log('[CARDCARD] Tipo do segundo cartão (inicial):', cardType);
+                    console.log('[CARDCARD] secondSelectedCardType():', self.secondSelectedCardType());
+                    console.log('[CARDCARD] secondCreditCardType():', self.secondCreditCardType());
+
+                    // If using saved card, get card type from payment profile
+                    if (self.secondSelectedPaymentProfile() && !cardType) {
+                        console.log('[CARDCARD] Usando cartão salvo no segundo cartão, ID do perfil:', self.secondSelectedPaymentProfile());
+                        var profiles = self.getPaymentProfiles();
+                        console.log('[CARDCARD] Perfis disponíveis (segundo cartão):', profiles);
+
+                        var selectedProfile = profiles.find(function(profile) {
+                            return profile.value == self.secondSelectedPaymentProfile();
+                        });
+                        if (selectedProfile) {
+                            cardType = selectedProfile.card_type;
+                            console.log('[CARDCARD] Tipo do segundo cartão do perfil:', cardType);
+                        }
+                    }
+
+                    console.log('[CARDCARD] Tipo do segundo cartão (final):', cardType);
+
+                    // Skip if no card type selected or amount is 0
+                    if (!cardType || secondCardAmount <= 0) {
+                        console.log('[CARDCARD] Pulando requisição do segundo cartão - cardType:', cardType, 'amount:', secondCardAmount);
+                        self.hasSecondInstallments(false);
+                        self.secondInstallments([]);
+                        self.secondInstallmentsDisabled(true);
+                        self.isLoadingSecondInstallments(false);
+                        return;
+                    }
+
+                    // Map card type to correct format
+                    var mappedCardType = self.mapCardType(cardType);
+                    console.log('[CARDCARD] Tipo do segundo cartão mapeado:', cardType, '->', mappedCardType);
+
+                    var requestBody = {
+                        cc_type: mappedCardType,
+                        payment_link: {
+                            grand_total: secondCardAmount
+                        }
+                    };
+
+                    console.log('[CARDCARD] Fazendo requisição para segundo cartão:', url);
+                    console.log('[CARDCARD] Dados da requisição (segundo cartão):', JSON.stringify(requestBody, null, 2));
+
+                    // Use the same structure as CardPix (working)
                     fetch(url, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({
-                            card_type: self.secondCreditCardType(),
-                            amount: secondCardAmount
-                        })
+                        body: JSON.stringify(requestBody)
                     }).then(function (response) {
+                        console.log('[CARDCARD] Resposta recebida (segundo cartão) - Status:', response.status);
+                        console.log('[CARDCARD] Resposta headers (segundo cartão):', response.headers);
+
+                        if (!response.ok) {
+                            throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+                        }
+
                         return response.json();
                     }).then(function (json) {
-                        self.hasSecondInstallments(true);
-                        self.secondInstallments(json);
-                        self.secondInstallmentsDisabled(false);
+                        console.log('[CARDCARD] Dados recebidos (segundo cartão):', json);
+                        console.log('[CARDCARD] Tipo dos dados (segundo cartão):', typeof json);
+                        console.log('[CARDCARD] É array? (segundo cartão):', Array.isArray(json));
+
+                        if (json && Array.isArray(json) && json.length > 0) {
+                            console.log('[CARDCARD] Parcelas encontradas (segundo cartão):', json.length);
+                            self.hasSecondInstallments(true);
+                            self.secondInstallments(json);
+                            self.secondInstallmentsDisabled(false);
+                        } else {
+                            console.log('[CARDCARD] Nenhuma parcela encontrada ou dados inválidos (segundo cartão)');
+                            self.hasSecondInstallments(false);
+                            self.secondInstallments([]);
+                            self.secondInstallmentsDisabled(true);
+                        }
                         self.isLoadingSecondInstallments(false);
-                    }).catch(function () {
-                        self.secondInstallmentsDisabled(false);
+                        console.log('[CARDCARD] updateSecondInstallmentsValues - SUCESSO');
+                    }).catch(function (error) {
+                        console.error('[CARDCARD] Erro na requisição de parcelas (segundo cartão):', error);
+                        console.error('[CARDCARD] Stack trace (segundo cartão):', error.stack);
+                        self.hasSecondInstallments(false);
+                        self.secondInstallments([]);
+                        self.secondInstallmentsDisabled(true);
                         self.isLoadingSecondInstallments(false);
                     });
-                }, 500);
+                }, 800);
             },
 
             /**
@@ -805,8 +1076,8 @@ define(
                 var paymentProfiles = [];
                 var savedCards = window.checkoutConfig &&
                     window.checkoutConfig.payment &&
-                    window.checkoutConfig.payment.vindi_vp_cardpix &&
-                    window.checkoutConfig.payment.vindi_vp_cardpix.saved_cards;
+                    window.checkoutConfig.payment.vindi_vp_cardcard &&
+                    window.checkoutConfig.payment.vindi_vp_cardcard.saved_cards;
 
                 if (savedCards && Array.isArray(savedCards)) {
                     savedCards.forEach(function (card) {
@@ -826,6 +1097,133 @@ define(
              */
             hasPaymentProfiles: function () {
                 return this.getPaymentProfiles().length > 0;
+            },
+
+            /**
+             * Validate form
+             * @returns {boolean}
+             */
+            validate: function () {
+                var self = this;
+
+                try {
+                    var $form = $('#' + 'form_' + this.getCode());
+
+                    // Validate first and second card amounts
+                    var firstCardAmount = parseFloat($('#first_card_amount').val() || 0);
+                    var secondCardAmount = parseFloat($('#second_card_amount').val() || 0);
+                    var grandTotal = this.getGrandTotal();
+
+                    // Reset error states
+                    this.showFirstCardError(false);
+                    this.showSecondCardError(false);
+                    $('#first_card_amount').removeClass('error');
+                    $('#second_card_amount').removeClass('error');
+                    this.isFormValid(true);
+
+                    // Validate first card amount
+                    if (firstCardAmount > grandTotal) {
+                        this.showFirstCardError(true);
+                        this.firstCardErrorMessage($t('O valor não pode ser maior que o total do pedido.'));
+                        $('#first_card_amount').addClass('error');
+                        this.isFormValid(false);
+                        return false;
+                    }
+
+                    // Validate second card amount
+                    if (secondCardAmount > grandTotal) {
+                        this.showSecondCardError(true);
+                        this.secondCardErrorMessage($t('O valor não pode ser maior que o total do pedido.'));
+                        $('#second_card_amount').addClass('error');
+                        this.isFormValid(false);
+                        return false;
+                    }
+
+                    // Validate total of both payment methods with tolerance for floating point errors
+                    var totalAmount = Math.round((firstCardAmount + secondCardAmount) * 100) / 100;
+                    var roundedGrandTotal = Math.round(grandTotal * 100) / 100;
+
+                    if (totalAmount > roundedGrandTotal + 0.01) { // Adding small tolerance (0.01)
+                        this.showFirstCardError(true);
+                        this.firstCardErrorMessage($t('A soma dos valores dos cartões não pode exceder o total do pedido.'));
+                        $('#first_card_amount').addClass('error');
+                        this.isFormValid(false);
+                        return false;
+                    }
+
+                    // Validate if at least one payment method is selected
+                    if (totalAmount === 0 || isNaN(totalAmount)) {
+                        this.showFirstCardError(true);
+                        this.firstCardErrorMessage($t('Pelo menos um método de pagamento deve ser selecionado.'));
+                        $('#first_card_amount').addClass('error');
+                        this.isFormValid(false);
+                        return false;
+                    }
+
+                    // Handle manual form validation instead of using jQuery validation plugin
+                    if ($form && $form.length) {
+                        var isValid = true;
+
+                        // Validate required fields
+                        $form.find('input[data-validate], select[data-validate]').each(function() {
+                            var $field = $(this);
+
+                            // Skip validation for fields in hidden sections
+                            if ($field.is(':hidden') || $field.closest('.field').is(':hidden')) {
+                                return;
+                            }
+
+                            // CVV validation is always required for both new and saved cards
+                            // Skip validation for payment profile when selected
+                            if (self.selectedPaymentProfile() && ($field.attr('id') === (self.getCode() + '_cc_number') ||
+                                $field.attr('id') === (self.getCode() + '_cc_owner') ||
+                                $field.attr('id') === (self.getCode() + '_cc_exp_date'))) {
+                                return;
+                            }
+
+                            // Skip validation for second payment profile when selected
+                            if (self.secondSelectedPaymentProfile() && ($field.attr('id') === (self.getCode() + '_second_cc_number') ||
+                                $field.attr('id') === (self.getCode() + '_second_cc_owner') ||
+                                $field.attr('id') === (self.getCode() + '_second_cc_exp_date'))) {
+                                return;
+                            }
+
+                            // Skip validation for first card fields when first card amount is 0
+                            if (firstCardAmount === 0 && ($field.attr('id') === (self.getCode() + '_cc_first_installments') ||
+                                $field.attr('id') === (self.getCode() + '_cc_number') ||
+                                $field.attr('id') === (self.getCode() + '_cc_owner') ||
+                                $field.attr('id') === (self.getCode() + '_cc_exp_date') ||
+                                $field.attr('id') === (self.getCode() + '_first_cc_cid'))) {
+                                return;
+                            }
+
+                            // Skip validation for second card fields when second card amount is 0
+                            if (secondCardAmount === 0 && ($field.attr('id') === (self.getCode() + '_cc_second_installments') ||
+                                $field.attr('id') === (self.getCode() + '_second_cc_number') ||
+                                $field.attr('id') === (self.getCode() + '_second_cc_owner') ||
+                                $field.attr('id') === (self.getCode() + '_second_cc_exp_date') ||
+                                $field.attr('id') === (self.getCode() + '_second_cc_cid'))) {
+                                return;
+                            }
+
+                            if ($field.val() === '') {
+                                isValid = false;
+                                $field.addClass('mage-error');
+                            } else {
+                                $field.removeClass('mage-error');
+                            }
+                        });
+
+                        if (!isValid) {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                } catch (e) {
+                    console.error('Validation error:', e);
+                    return false;
+                }
             }
         });
     }

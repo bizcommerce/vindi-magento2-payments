@@ -47,16 +47,19 @@ class TransferFactory implements TransferFactoryInterface
      */
     public function create(array $request)
     {
-        if (isset($request['request_card'])) {
-            $this->transferBuilder->setBody($request['request_card']);
-        } elseif (isset($request['request'])) {
+        // Support for both new (request) and old (request_card) structures
+        if (isset($request['request'])) {
             $this->transferBuilder->setBody($request['request']);
+        } elseif (isset($request['request_card'])) {
+            $this->transferBuilder->setBody($request['request_card']);
         } else {
-            throw new \InvalidArgumentException('Request body not found (expected request_card or request)');
+            throw new \InvalidArgumentException('Request body not found (expected request or request_card)');
         }
+        
         if (isset($request['client_config'])) {
             $this->transferBuilder->setClientConfig($request['client_config']);
         }
+        
         return $this->transferBuilder->build();
     }
 }

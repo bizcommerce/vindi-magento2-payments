@@ -120,8 +120,8 @@ class PaymentsRequest
             'finger_print'        => $order->getPayment()->getAdditionalInformation('finger_print'),
             'customer'            => $this->getCustomerData($order),
             'transaction'         => $this->getTransactionInfo($order, $amount),
-            'transaction_shipping'=> $this->getTransactionShipping($order),
-            'transaction_product' => $this->getItemsData($order)
+            'transaction_shipping'=> $this->getTransactionShipping($order, $amount),
+            'transaction_product' => $this->getItemsData($order, $amount)
         ];
 
         $resellerToken = $this->helper->getResellerToken($order->getStoreId());
@@ -155,16 +155,25 @@ class PaymentsRequest
      * Get the shipping information for the transaction.
      *
      * @param Order $order
+     * @param float $transactionAmount
      * @return array
      */
-    protected function getTransactionShipping(Order $order): array
+    protected function getTransactionShipping(Order $order, float $transactionAmount = null): array
     {
         $shippingDescription = $order->getShippingDescription();
         $shippingType = $shippingDescription ? $shippingDescription : 'SEM_FRETE';
+        
+        // Se não foi fornecido um valor específico, usar o valor total do shipping
+        $shippingAmount = $order->getShippingAmount();
+        if ($transactionAmount !== null && $order->getGrandTotal() > 0) {
+            // Calcular o shipping proporcional ao valor da transação
+            $proportion = $transactionAmount / $order->getGrandTotal();
+            $shippingAmount = round($shippingAmount * $proportion, 2);
+        }
 
         return [
             'type_shipping' => $shippingType,
-            'shipping_price'=> (string) $order->getShippingAmount()
+            'shipping_price'=> (string) $shippingAmount
         ];
     }
 
@@ -177,12 +186,40 @@ class PaymentsRequest
      */
     public function getDiscountAmount(Order $order, $orderAmount): float
     {
-        $discountAmount = (float) $order->getDiscountAmount();
-        $transactionAmount = $order->getBaseSubtotal() + $order->getShippingAmount() + $discountAmount;
-        if ($transactionAmount > $orderAmount) {
-            $discountAmount = $transactionAmount - $orderAmount;
+        $originalDiscountAmount = abs((float) $order->getDiscountAmount());
+        
+        // Se não há desconto no pedido, retornar 0
+        if ($originalDiscountAmount <= 0) {
+            return 0.0;
         }
-        return round(abs($discountAmount), 2);
+        
+        // Se o valor da transação é igual ao total do pedido, usar o desconto completo
+        if ($orderAmount >= $order->getGrandTotal()) {
+            return round($originalDiscountAmount, 2);
+        }
+        
+        // Calcular desconto proporcional ao valor da transação
+        $totalOrder = $order->getGrandTotal();
+        if ($totalOrder > 0) {
+            $proportion = $orderAmount / $totalOrder;
+            $proportionalDiscount = $originalDiscountAmount * $proportion;
+            
+            // Garantir que o desconto nunca seja maior que o valor da transação menos o frete
+            $shippingAmount = (float) $order->getShippingAmount();
+            $proportionalShipping = $shippingAmount * $proportion;
+            $maxDiscount = $orderAmount - $proportionalShipping;
+            
+            if ($proportionalDiscount > $maxDiscount && $maxDiscount > 0) {
+                $proportionalDiscount = $maxDiscount;
+            }
+            
+            // Debug log
+            error_log("DISCOUNT DEBUG - Order: {$order->getIncrementId()}, Original: {$originalDiscountAmount}, OrderAmount: {$orderAmount}, Total: {$totalOrder}, Proportion: {$proportion}, ProportionalDiscount: {$proportionalDiscount}, MaxDiscount: {$maxDiscount}");
+            
+            return round(max(0, $proportionalDiscount), 2);
+        }
+        
+        return 0.0;
     }
 
     /**
@@ -194,12 +231,29 @@ class PaymentsRequest
      */
     protected function getPriceAdditional(Order $order, float $orderAmount): float
     {
-        $priceAdditional = 0;
-        $transactionAmount = (float) $order->getBaseSubtotal() + (float) $order->getShippingAmount() + (float) $order->getDiscountAmount();
-        if ($transactionAmount < $orderAmount) {
-            $priceAdditional = $orderAmount - $transactionAmount;
+        // Para transações divididas (Card + Pix), normalmente não há price_additional
+        // O price_additional é usado quando o valor da transação é maior que a soma dos produtos + frete - desconto
+        
+        $baseSubtotal = (float) $order->getBaseSubtotal();
+        $shippingAmount = (float) $order->getShippingAmount();
+        $discountAmount = abs((float) $order->getDiscountAmount());
+        
+        // Calcular valores proporcionais se não for o valor total do pedido
+        if ($orderAmount < $order->getGrandTotal()) {
+            $proportion = $orderAmount / $order->getGrandTotal();
+            $baseSubtotal = $baseSubtotal * $proportion;
+            $shippingAmount = $shippingAmount * $proportion;
+            $discountAmount = $discountAmount * $proportion;
         }
-        return round((float) $priceAdditional, 2);
+        
+        $expectedTotal = $baseSubtotal + $shippingAmount - $discountAmount;
+        
+        if ($orderAmount > $expectedTotal) {
+            $priceAdditional = $orderAmount - $expectedTotal;
+            return round($priceAdditional, 2);
+        }
+        
+        return 0.0;
     }
 
     /**
@@ -297,12 +351,19 @@ class PaymentsRequest
      * Get items data for the transaction.
      *
      * @param Order $order
+     * @param float $transactionAmount
      * @return array
      */
-    protected function getItemsData(Order $order): array
+    protected function getItemsData(Order $order, float $transactionAmount = null): array
     {
         $items = [];
         $quoteItems = $order->getAllItems();
+        
+        // Calcular proporção se um valor específico for fornecido
+        $proportion = 1.0;
+        if ($transactionAmount !== null && $order->getBaseSubtotal() > 0) {
+            $proportion = $transactionAmount / $order->getBaseSubtotal();
+        }
 
         /** @var OrderItemInterface $quoteItem */
         foreach ($quoteItems as $quoteItem) {
@@ -313,7 +374,14 @@ class PaymentsRequest
             $item = [];
             $item['description'] = $quoteItem->getName();
             $item['quantity']    = (string) $quoteItem->getQtyOrdered();
-            $item['price_unit']  = (string) $quoteItem->getPrice();
+            
+            // Aplicar proporção no preço unitário se necessário
+            $priceUnit = $quoteItem->getPrice();
+            if ($transactionAmount !== null) {
+                $priceUnit = round($priceUnit * $proportion, 2);
+            }
+            
+            $item['price_unit']  = (string) $priceUnit;
             $item['code']        = $quoteItem->getProductId();
             $item['sku_code']    = $quoteItem->getSku();
             $item['extra']       = $quoteItem->getItemId();

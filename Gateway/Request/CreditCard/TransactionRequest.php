@@ -178,9 +178,11 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
             throw new LocalizedException(__('Saved card not found or does not belong to the current customer.'));
         }
 
-        $cvv = $payment->getCcCid();
-        if (!$cvv) {
-            throw new LocalizedException(__('CVV is required for saved cards.'));
+        $cvv = $payment->getCcCid() ?: $payment->getAdditionalInformation('cc_cid');
+        
+        // CVV é sempre obrigatório para todos os cartões
+        if (!$cvv || trim($cvv) === '') {
+            throw new LocalizedException(__('CVV is required for all cards.'));
         }
 
         $order      = $payment->getOrder();

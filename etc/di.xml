@@ -41,6 +41,7 @@
                 <item name="vindi:vp:cancel-orders-with-expired-links" xsi:type="object">Vindi\VP\Console\Command\RunCancelOrdersWithExpiredLinks</item>
                 <item name="vindi:vp:clear-old-access-tokens" xsi:type="object">Vindi\VP\Console\Command\ClearOldAccessTokensCommand</item>
                 <item name="vindi:process-callback-queue" xsi:type="object">Vindi\VP\Console\Command\ProcessCallbackQueueCommand</item>
+                <item name="vindi:process-multi-payment-queue" xsi:type="object">Vindi\VP\Console\Command\ProcessMultiPaymentQueue</item>
             </argument>
         </arguments>
     </type>
@@ -595,6 +596,13 @@
         </arguments>
     </virtualType>
 
+    <!-- Card + Card Transaction Request -->
+    <virtualType name="VindiCardCardTransactionRequest" type="Vindi\VP\Gateway\Request\CardCard\TransactionRequest">
+        <arguments>
+            <argument name="config" xsi:type="object">VindiCardCardConfig</argument>
+        </arguments>
+    </virtualType>
+
     <!-- Card + Card Order Request -->
     <virtualType name="VindiCardCardOrderRequest" type="Magento\Payment\Gateway\Request\BuilderComposite">
         <arguments>
@@ -605,7 +613,7 @@
     </virtualType>
 
     <!-- Card + Card Client Transaction -->
-    <virtualType name="VindiCardCardClientTransaction" type="Vindi\VP\Gateway\Http\Client\Transaction">
+    <virtualType name="VindiCardCardClientTransaction" type="Vindi\VP\Gateway\Http\Client\CardCardTransaction">
         <arguments>
             <argument name="methodCode" xsi:type="string">vindi_vp_cardcard</argument>
         </arguments>

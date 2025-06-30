@@ -95,35 +95,20 @@ class CardPixTransaction implements ClientInterface
         $this->logRequest($request);
         $storeId = $request['client_config']['store_id'] ?? null;
 
-        // Dispara a transação do cartão primeiro
-        $cardResponse = $this->processCardPayment($request['card_request'], $storeId);
+        // Process only the card payment (primary transaction)
+        $cardResponse = $this->processCardPayment($request, $storeId);
 
-        // Se cartão aprovado, dispara Pix
         if ($this->isSuccessfulCardResponse($cardResponse)) {
-            $pixResponse = $this->processPixPayment($request['pix_request'], $storeId);
-
-            // Se Pix falhar, estorna cartão
-            if (!$this->isSuccessfulPixResponse($pixResponse)) {
-                $this->refundCardPayment($cardResponse, $storeId);
-                return [
-                    'error' => true,
-                    'card_response' => $cardResponse,
-                    'pix_response' => $pixResponse
-                ];
-            }
-
-            // Sucesso nos dois meios
             return [
                 'success' => true,
-                'card_response' => $cardResponse,
-                'pix_response' => $pixResponse
+                'transaction' => $cardResponse
             ];
         }
 
-        // Cartão recusado
+        // Card payment failed
         return [
             'error' => true,
-            'card_response' => $cardResponse
+            'transaction' => $cardResponse
         ];
     }
 

@@ -364,6 +364,11 @@ define(
                     ccExpMonth = ccExpDateFull[0];
                     ccExpYear = ccExpDateFull[1].length === 2 ? '20' + ccExpDateFull[1] : ccExpDateFull[1];
                 }
+
+                // Capturar valores do multimeios
+                var cardAmount = parseFloat($('#card_amount').val() || 0);
+                var pixAmount = parseFloat($('#pix_amount').val() || 0);
+
                 return {
                     'method': this.item.method,
                     'additional_data': {
@@ -377,7 +382,9 @@ define(
                         'cc_owner': this.creditCardOwner(),
                         'installments': this.creditCardInstallments(),
                         'save_card': this.saveCard() ? 1 : 0,
-                        'fingerprint': (window.yapay && window.yapay.FingerPrint) ? window.yapay.FingerPrint().getFingerPrint() : ''
+                        'fingerprint': (window.yapay && window.yapay.FingerPrint) ? window.yapay.FingerPrint().getFingerPrint() : '',
+                        'amount_credit': cardAmount,
+                        'amount_pix': pixAmount
                     }
                 };
             },
@@ -500,11 +507,11 @@ define(
                                 return;
                             }
 
+                            // CVV validation is always required for both new and saved cards
                             // Skip validation for payment profile when selected
                             if (self.selectedPaymentProfile() && ($field.attr('id') === (self.getCode() + '_cc_number') ||
                                 $field.attr('id') === (self.getCode() + '_cc_owner') ||
-                                $field.attr('id') === (self.getCode() + '_cc_exp_date') ||
-                                $field.attr('id') === (self.getCode() + '_cc_cid'))) {
+                                $field.attr('id') === (self.getCode() + '_cc_exp_date'))) {
                                 return;
                             }
 

@@ -14,5 +14,8 @@
         <job name="vindi_vp_process_pix_queue" instance="Vindi\VP\Cron\ProcessPixQueue" method="execute">
             <schedule>*/2 * * * *</schedule>
         </job>
+        <job name="vindi_vp_process_multi_payment_queue" instance="Vindi\VP\Cron\ProcessMultiPaymentQueue" method="execute">
+            <schedule>*/5 * * * *</schedule>
+        </job>
     </group>
 </config>

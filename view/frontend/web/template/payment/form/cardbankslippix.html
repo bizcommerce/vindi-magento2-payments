@@ -199,6 +199,28 @@
                         </div>
                     </div>
 
+                    <!-- CVV field for saved cards (required) -->
+                    <div class="field number required" data-bind="visible: selectedPaymentProfile()">
+                        <label class="label" data-bind="attr: {for: getCode() + '_cc_cid_saved'}">
+                            <span data-bind="i18n: 'CVV'"></span>
+                        </label>
+                        <div class="control">
+                            <input
+                                type="text"
+                                name="payment[cc_cid]"
+                                class="input-text-vindi"
+                                maxlength="4"
+                                data-bind="attr: {
+                                    id: getCode() + '_cc_cid_saved',
+                                    placeholder: $t('CVV'),
+                                    'data-validate': JSON.stringify({'required-number':true})
+                                },
+                                enable: isActive($parents),
+                                value: creditCardVerificationNumber"
+                            />
+                        </div>
+                    </div>
+
                     <div class="field save-card" data-bind="visible: !selectedPaymentProfile()">
                         <label for="save_card_checkbox" class="label">
                             <input

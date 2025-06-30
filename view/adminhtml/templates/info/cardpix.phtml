@@ -1,0 +1,41 @@
+<?php /** @var $block \Vindi\VP\Block\Info\CardPix */ ?>
+<?php
+$info = $block->getInfo();
+$additionalInfo = $info->getAdditionalInformation();
+
+// Campos essenciais para exibir
+$essentialFields = [
+    'payment_method_name' => __('Payment Method'),
+    'amount_credit' => __('Credit Amount'),
+    'amount_pix' => __('Pix Amount'),
+    'installments' => __('Installments'),
+    'status_name' => __('Status'),
+    'transaction_id' => __('Transaction ID')
+];
+?>
+<div class="admin__page-section-item order-payment-method">
+    <div class="admin__page-section-item-title">
+        <span class="title"><?= $block->escapeHtml(__('Payment Information')) ?></span>
+    </div>
+    <div class="admin__page-section-item-content">
+        <div class="order-payment-method-title">
+            <strong><?= $block->escapeHtml(__('Method:')) ?></strong> <?= $block->escapeHtml(__('Card + Pix')) ?>
+        </div>
+        <div class="order-payment-method-content">
+            <?php if ($additionalInfo): ?>
+                <?php foreach ($essentialFields as $key => $label): ?>
+                    <?php if (isset($additionalInfo[$key]) && !empty($additionalInfo[$key])): ?>
+                        <div class="payment-method-info-row">
+                            <strong><?= $block->escapeHtml($label) ?>:</strong>
+                            <?php if ($key === 'amount_credit' || $key === 'amount_pix'): ?>
+                                R$ <?= $block->escapeHtml(number_format((float)$additionalInfo[$key], 2, ',', '.')) ?>
+                            <?php else: ?>
+                                <?= $block->escapeHtml($additionalInfo[$key]) ?>
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>

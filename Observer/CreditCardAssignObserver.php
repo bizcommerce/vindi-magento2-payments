@@ -108,6 +108,19 @@ class CreditCardAssignObserver extends AbstractDataAssignObserver
                 $paymentInfo->setAdditionalInformation('payment_method', $this->helper->getMethodName($ccType));
                 $paymentInfo->setAdditionalInformation('payment_profile', $paymentProfile);
                 $paymentInfo->setAdditionalInformation('save_card', $saveCard);
+                $paymentInfo->setAdditionalInformation('cc_cid', $additionalData['cc_cid'] ?? null);
+
+                // Capturar valores específicos para multimeios
+                if (in_array($method, ['vindi_vp_cardpix', 'vindi_vp_cardbankslippix', 'vindi_vp_cardcard'])) {
+                    $amountCredit = $additionalData['amount_credit'] ?? 0;
+                    $amountPix = $additionalData['amount_pix'] ?? 0;
+                    
+                    $paymentInfo->setAdditionalInformation('amount_credit', (float)$amountCredit);
+                    $paymentInfo->setAdditionalInformation('amount_pix', (float)$amountPix);
+                }
+
+                // CVV é sempre obrigatório para todos os cartões
+                $paymentInfo->setAdditionalInformation('cc_cid_required', true);
             }
 
             // Novo: tratamento do segundo cartão para CardCard
@@ -135,6 +148,9 @@ class CreditCardAssignObserver extends AbstractDataAssignObserver
                 $paymentInfo->setAdditionalInformation('cc_cid_2', $additionalData['cc_cid_2'] ?? null);
                 $paymentInfo->setAdditionalInformation('cc_exp_month_2', $ccExpMonth2);
                 $paymentInfo->setAdditionalInformation('cc_exp_year_2', $ccExpYear2);
+
+                // CVV é sempre obrigatório para o segundo cartão também
+                $paymentInfo->setAdditionalInformation('cc_cid_2_required', true);
             }
         }
     }

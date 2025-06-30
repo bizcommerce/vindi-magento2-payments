@@ -26,8 +26,11 @@ use Magento\Framework\Event\ManagerInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\Session\SessionManagerInterface;
 use Vindi\VP\Gateway\Request\PaymentsRequest;
-use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Exception\LocalizedException;
 use Psr\Log\LoggerInterface;
+use Vindi\VP\Model\ResourceModel\CreditCard\CollectionFactory as CreditCardCollectionFactory;
+use Vindi\VP\Model\MultiPaymentQueueService;
+use Vindi\VP\Model\MultiPaymentQueue;
 
 /**
  * Class TransactionRequest
@@ -46,6 +49,21 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
     protected $session;
 
     /**
+     * @var LoggerInterface
+     */
+    protected $logger;
+
+    /**
+     * @var CreditCardCollectionFactory
+     */
+    protected $creditCardCollectionFactory;
+
+    /**
+     * @var MultiPaymentQueueService
+     */
+    protected $multiPaymentQueueService;
+
+    /**
      * TransactionRequest constructor.
      *
      * @param ManagerInterface $eventManager
@@ -59,6 +77,9 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
      * @param Api $api
      * @param EncryptorInterface $encryptor
      * @param SessionManagerInterface $session
+     * @param LoggerInterface $logger
+     * @param CreditCardCollectionFactory $creditCardCollectionFactory
+     * @param MultiPaymentQueueService $multiPaymentQueueService
      */
     public function __construct(
         ManagerInterface $eventManager,
@@ -71,7 +92,10 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         CategoryRepositoryInterface $categoryRepository,
         Api $api,
         EncryptorInterface $encryptor,
-        SessionManagerInterface $session
+        SessionManagerInterface $session,
+        LoggerInterface $logger,
+        CreditCardCollectionFactory $creditCardCollectionFactory,
+        MultiPaymentQueueService $multiPaymentQueueService
     ) {
         $this->eventManager = $eventManager;
         $this->helper = $helper;
@@ -84,6 +108,9 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         $this->api = $api;
         $this->encryptor = $encryptor;
         $this->session = $session;
+        $this->logger = $logger;
+        $this->creditCardCollectionFactory = $creditCardCollectionFactory;
+        $this->multiPaymentQueueService = $multiPaymentQueueService;
 
         parent::__construct(
             $eventManager,
@@ -99,7 +126,7 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
     }
 
     /**
-     * Builds the CardPix (Card + Pix) or pure Card request
+     * Builds the CardPix primary request (Card only) and queues PIX for later processing
      *
      * @param array $buildSubject
      * @return array
@@ -116,37 +143,71 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         $payment = $buildSubject['payment']->getPayment();
         $order = $payment->getOrder();
 
-        // Sempre fluxo cartão + pix
-        $grandTotal = (float)$order->getGrandTotal();
-        $shipping = (float)$order->getShippingAmount();
-        $discount = abs((float)$order->getDiscountAmount());
-
-        // Valores de split vindos do frontend (garantir fallback)
+        // Valores de split vindos do frontend
         $amountCredit = (float)($payment->getAdditionalInformation('amount_credit') ?? 0);
         $amountPix = (float)($payment->getAdditionalInformation('amount_pix') ?? 0);
 
-        // Fallback: se não vierem, dividir meio a meio
+        // Se não vierem valores, dividir meio a meio como fallback
         if ($amountCredit <= 0 && $amountPix <= 0) {
+            $grandTotal = (float)$order->getGrandTotal();
             $amountCredit = round($grandTotal / 2, 2);
             $amountPix = $grandTotal - $amountCredit;
         }
 
-        // Proporção para shipping e desconto
-        $totalSplit = $amountCredit + $amountPix;
-        $shippingCard = $totalSplit > 0 ? round($shipping * ($amountCredit / $totalSplit), 2) : 0;
-        $shippingPix = $shipping - $shippingCard;
-        $discountCard = $totalSplit > 0 ? round($discount * ($amountCredit / $totalSplit), 2) : 0;
-        $discountPix = $discount - $discountCard;
+        // Log para debug dos valores
+        $this->logger->info('CardPix Transaction Build - Order: ' . $order->getIncrementId() . 
+                     ', Total: ' . $order->getGrandTotal() . 
+                     ', Subtotal: ' . $order->getBaseSubtotal() .
+                     ', Shipping: ' . $order->getShippingAmount() .
+                     ', Discount: ' . $order->getDiscountAmount() .
+                     ', Credit: ' . $amountCredit . 
+                     ', Pix: ' . $amountPix);
 
-        // Montar requests separados
-        $cardRequest = $this->buildCardRequest($order, $payment, $amountCredit, $amountPix, $shippingCard, $discountCard);
-        $pixRequest = $this->buildPixRequest($order, $payment, $amountCredit, $amountPix, $shippingPix, $discountPix);
+        // Construir apenas a requisição do cartão (primeira transação)
+        $cardRequest = $this->buildPrimaryCardRequest($order, $payment, $amountCredit);
+
+        // Salvar o registro do PIX na queue logo após criar a requisição do cartão
+        $this->queuePixPayment($order, $payment, $amountPix);
 
         return [
-            'request_card' => $cardRequest,
-            'request_pix' => $pixRequest,
-            'client_config' => ['store_id' => (int)$order->getStoreId()]
+            'request' => $cardRequest,
+            'client_config' => [
+                'store_id' => (int)$order->getStoreId(),
+                'amount_pix' => $amountPix, // Para ser usado no response handler
+                'increment_id' => $order->getIncrementId()
+            ]
         ];
+    }
+
+    /**
+     * Build only the primary card request (first transaction)
+     *
+     * @param \Magento\Sales\Model\Order $order
+     * @param \Magento\Sales\Model\Order\Payment $payment
+     * @param float $amountCredit
+     * @return array
+     */
+    private function buildPrimaryCardRequest($order, $payment, float $amountCredit): array
+    {
+        // Get the base transaction request for the card amount only
+        $transaction = $this->getTransaction($order, $amountCredit);
+
+        // Override order_number with increment_id-01 format for card payment
+        $orderNumber = $order->getIncrementId() . '-01';
+        $transaction['transaction']['order_number'] = $orderNumber;
+
+        // Log para confirmar o order_number
+        $this->logger->info('CardPix Primary Transaction - Order Number: ' . $orderNumber . ', Amount: ' . $amountCredit);
+
+        // Add credit card payment data
+        $paymentProfileId = $payment->getAdditionalInformation('payment_profile');
+        if ($paymentProfileId) {
+            $transaction['payment'] = $this->getSavedCardData((string)$paymentProfileId, $payment);
+        } else {
+            $transaction['payment'] = $this->getNewCardData($payment);
+        }
+
+        return $transaction;
     }
 
     /**
@@ -225,23 +286,24 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         $customerId = $this->customerSession->getCustomerId();
 
         if (!$customerId) {
-            throw new \Magento\Framework\Exception\LocalizedException(__('Customer is not logged in.'));
+            throw new LocalizedException(__('Customer is not logged in.'));
         }
 
-        $creditCardResource = \Magento\Framework\App\ObjectManager::getInstance()
-            ->get(\Vindi\VP\Model\ResourceModel\CreditCard\CollectionFactory::class)
+        $creditCardResource = $this->creditCardCollectionFactory
             ->create()
             ->addFieldToFilter('entity_id', $paymentProfileId)
             ->addFieldToFilter('customer_id', $customerId)
             ->getFirstItem();
 
         if (!$creditCardResource->getId()) {
-            throw new \Magento\Framework\Exception\LocalizedException(__('Saved card not found or does not belong to the current customer.'));
+            throw new LocalizedException(__('Saved card not found or does not belong to the current customer.'));
         }
 
-        $cvv = $payment->getAdditionalInformation('cc_cid');
-        if (!$cvv) {
-            throw new \Magento\Framework\Exception\LocalizedException(__('CVV is required for saved cards.'));
+        $cvv = $payment->getAdditionalInformation('cc_cid') ?: $payment->getCcCid();
+        
+        // CVV é sempre obrigatório para todos os cartões
+        if (!$cvv || trim($cvv) === '') {
+            throw new LocalizedException(__('CVV is required for all cards.'));
         }
 
         $order = $payment->getOrder();
@@ -301,5 +363,117 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         }
 
         return $cardData;
+    }
+
+    /**
+     * Queue PIX payment for later processing
+     *
+     * @param \Magento\Sales\Model\Order $order
+     * @param \Magento\Sales\Model\Order\Payment $payment
+     * @param float $amountPix
+     * @return void
+     */
+    private function queuePixPayment($order, $payment, float $amountPix): void
+    {
+        if ($amountPix <= 0) {
+            return; // No PIX amount to process
+        }
+
+        // Build PIX request data
+        $pixRequestData = $this->buildPixRequestData($order, $payment, $amountPix);
+
+        // Store PIX queue data in payment additional information for later processing
+        // This will be processed after the order is saved via observer
+        $pixQueueData = [
+            'increment_id' => (string)$order->getIncrementId(),
+            'payment_method' => 'vindi_vp_cardpix',
+            'secondary_method_type' => MultiPaymentQueue::SECONDARY_METHOD_PIX,
+            'secondary_amount' => $amountPix,
+            'request_data' => $pixRequestData,
+            'status' => MultiPaymentQueue::STATUS_PENDING
+        ];
+
+        $payment->setAdditionalInformation('pix_queue_data', $pixQueueData);
+
+        // Log the queue operation
+        $this->logger->info(
+            "CardPix - PIX payment data prepared for queue for order {$order->getIncrementId()} with amount: {$amountPix}",
+            ['increment_id' => $order->getIncrementId(), 'amount_pix' => $amountPix]
+        );
+    }
+
+    /**
+     * Build PIX request data for queue processing
+     *
+     * @param \Magento\Sales\Model\Order $order
+     * @param \Magento\Sales\Model\Order\Payment $payment
+     * @param float $amountPix
+     * @return array
+     */
+    private function buildPixRequestData($order, $payment, float $amountPix): array
+    {
+        // Generate secondary transaction ID for PIX (increment_id-02)
+        $pixOrderNumber = $order->getIncrementId() . '-02';
+
+        return [
+            'token_account' => $this->helper->getToken($order->getStoreId()),
+            'finger_print' => $payment->getAdditionalInformation('finger_print'),
+            'customer' => $this->getCustomerData($order),
+            'transaction' => [
+                'customer_ip' => $order->getRemoteIp() ?: '127.0.0.1',
+                'order_number' => $pixOrderNumber,
+                'price_discount' => '0', // PIX portion discount will be calculated proportionally
+                'price_additional' => '0',
+                'url_notification' => $this->helper->getPaymentsNotificationUrl($order),
+                'free' => 'MAGENTO_API_' . $this->helper->getModuleVersion()
+            ],
+            'transaction_shipping' => [
+                'type_shipping' => $order->getShippingDescription() ?: 'SEM_FRETE',
+                'shipping_price' => '0' // PIX portion shipping will be calculated proportionally
+            ],
+            'transaction_product' => $this->getPixItemsData($order, $amountPix),
+            'payment' => [
+                'payment_method_id' => $this->helper->getMethodId('PIX'),
+                'split' => 1
+            ]
+        ];
+    }
+
+    /**
+     * Get items data for PIX request with proportional amounts
+     *
+     * @param \Magento\Sales\Model\Order $order
+     * @param float $pixAmount
+     * @return array
+     */
+    private function getPixItemsData($order, float $pixAmount): array
+    {
+        $items = [];
+        $quoteItems = $order->getAllItems();
+        
+        // Calculate proportion for PIX amount
+        $proportion = 1.0;
+        if ($order->getBaseSubtotal() > 0) {
+            $proportion = $pixAmount / $order->getBaseSubtotal();
+        }
+
+        foreach ($quoteItems as $quoteItem) {
+            if ($quoteItem->getParentItemId() || $quoteItem->getParentItem() || $quoteItem->getPrice() == 0) {
+                continue;
+            }
+
+            $priceUnit = round($quoteItem->getPrice() * $proportion, 2);
+            
+            $items[] = [
+                'description' => $quoteItem->getName(),
+                'quantity' => (string) $quoteItem->getQtyOrdered(),
+                'price_unit' => (string) $priceUnit,
+                'code' => $quoteItem->getProductId(),
+                'sku_code' => $quoteItem->getSku(),
+                'extra' => $quoteItem->getItemId()
+            ];
+        }
+
+        return $items;
     }
 }

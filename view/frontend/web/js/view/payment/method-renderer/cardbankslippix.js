@@ -699,6 +699,122 @@ define(
              */
             hasPaymentProfiles: function () {
                 return this.getPaymentProfiles().length > 0;
+            },
+
+            /**
+             * Validate form
+             * @returns {boolean}
+             */
+            validate: function () {
+                var self = this;
+
+                try {
+                    var $form = $('#' + 'form_' + this.getCode());
+
+                    // Validate card and bankslip amounts
+                    var cardAmount = parseFloat($('#bankslippix_card_amount').val() || 0);
+                    var bankslipAmount = parseFloat($('#bankslippix_bankslip_amount').val() || 0);
+                    var grandTotal = this.getGrandTotal();
+
+                    // Reset error states
+                    this.showCardError(false);
+                    this.showBankslipError(false);
+                    $('#bankslippix_card_amount').removeClass('error');
+                    $('#bankslippix_bankslip_amount').removeClass('error');
+                    this.isFormValid(true);
+
+                    // Validate card amount
+                    if (cardAmount > grandTotal) {
+                        this.showCardError(true);
+                        this.cardErrorMessage($t('O valor excede o valor total do pedido.'));
+                        $('#bankslippix_card_amount').addClass('error');
+                        this.isFormValid(false);
+                        return false;
+                    }
+
+                    // Validate bankslip amount
+                    if (bankslipAmount > grandTotal) {
+                        this.showBankslipError(true);
+                        this.bankslipErrorMessage($t('O valor excede o valor total do pedido.'));
+                        $('#bankslippix_bankslip_amount').addClass('error');
+                        this.isFormValid(false);
+                        return false;
+                    }
+
+                    // Validate total of both payment methods with tolerance for floating point errors
+                    var totalAmount = Math.round((cardAmount + bankslipAmount) * 100) / 100;
+                    var roundedGrandTotal = Math.round(grandTotal * 100) / 100;
+
+                    if (totalAmount > roundedGrandTotal + 0.01) { // Adding small tolerance (0.01)
+                        this.showCardError(true);
+                        this.cardErrorMessage($t('A soma dos valores excede o total do pedido.'));
+                        $('#bankslippix_card_amount').addClass('error');
+                        this.isFormValid(false);
+                        return false;
+                    }
+
+                    // Validate if at least one payment method is selected
+                    if (totalAmount === 0 || isNaN(totalAmount)) {
+                        this.showCardError(true);
+                        this.cardErrorMessage($t('Informe um valor para pelo menos um método de pagamento.'));
+                        $('#bankslippix_card_amount').addClass('error');
+                        this.isFormValid(false);
+                        return false;
+                    }
+
+                    // Handle manual form validation instead of using jQuery validation plugin
+                    if ($form && $form.length) {
+                        var isValid = true;
+
+                        // Validate required fields
+                        $form.find('input[data-validate], select[data-validate]').each(function() {
+                            var $field = $(this);
+
+                            // Skip validation for fields in hidden sections
+                            if ($field.is(':hidden') || $field.closest('.field').is(':hidden')) {
+                                return;
+                            }
+
+                            // CVV validation is always required for both new and saved cards
+                            // Skip validation for payment profile when selected
+                            if (self.selectedPaymentProfile() && ($field.attr('id') === (self.getCode() + '_cc_number') ||
+                                $field.attr('id') === (self.getCode() + '_cc_owner') ||
+                                $field.attr('id') === (self.getCode() + '_cc_exp_date'))) {
+                                return;
+                            }
+
+                            // Skip validation for fields when card amount is 0
+                            if (cardAmount === 0 && ($field.attr('id') === (self.getCode() + '_cc_installments') ||
+                                $field.attr('id') === (self.getCode() + '_cc_number') ||
+                                $field.attr('id') === (self.getCode() + '_cc_owner') ||
+                                $field.attr('id') === (self.getCode() + '_cc_exp_date') ||
+                                $field.attr('id') === (self.getCode() + '_cc_cid'))) {
+                                return;
+                            }
+
+                            // Skip validation for taxvat when bankslip amount is 0
+                            if (bankslipAmount === 0 && $field.attr('id') === (self.getCode() + '_taxvat')) {
+                                return;
+                            }
+
+                            if ($field.val() === '') {
+                                isValid = false;
+                                $field.addClass('mage-error');
+                            } else {
+                                $field.removeClass('mage-error');
+                            }
+                        });
+
+                        if (!isValid) {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                } catch (e) {
+                    console.error('Validation error:', e);
+                    return false;
+                }
             }
         });
     }

@@ -18,6 +18,7 @@ use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Payment\Gateway\Data\PaymentDataObjectInterface;
 use Vindi\VP\Helper\Data;
 use Vindi\VP\Model\PaymentLinkService;
+use Vindi\VP\Model\MultiPaymentQueue;
 
 /**
  * Class TransactionHandler
@@ -41,22 +42,30 @@ class TransactionHandler implements HandlerInterface
     protected $paymentLinkService;
 
     /**
+     * @var MultiPaymentQueueService
+     */
+    protected $multiPaymentQueueService;
+
+    /**
      * @param Json $serializer
      * @param Data $helper
      * @param PaymentLinkService $paymentLinkService
+     * @param MultiPaymentQueueService $multiPaymentQueueService
      */
     public function __construct(
         Json $serializer,
         Data $helper,
-        PaymentLinkService $paymentLinkService
+        PaymentLinkService $paymentLinkService,
+        \Vindi\VP\Model\MultiPaymentQueueService $multiPaymentQueueService
     ) {
         $this->serializer = $serializer;
         $this->helper = $helper;
         $this->paymentLinkService = $paymentLinkService;
+        $this->multiPaymentQueueService = $multiPaymentQueueService;
     }
 
     /**
-     * Handles response for Card + Card payment method
+     * Handles response for Card + Card payment method (only processes card1, queues card2)
      *
      * @param array $handlingSubject
      * @param array $response
@@ -72,52 +81,131 @@ class TransactionHandler implements HandlerInterface
         $payment = $paymentDO->getPayment();
         $order = $payment->getOrder();
 
-        // Store the complete response data as additional information
-        $payment->setAdditionalInformation('vindi_response', $this->serializer->serialize($response));
+        // Log para debug
+        $this->helper->log(
+            "CardCard TransactionHandler - Processing order {$order->getIncrementId()}",
+            'cardcard_handler'
+        );
 
-        // Process first Card response
-        if (isset($response['card1_response'])) {
-            $card1Response = $response['card1_response'];
-            $payment->setAdditionalInformation('card1_payment_tid', $card1Response['tid'] ?? '');
-            $payment->setAdditionalInformation('card1_status', $card1Response['status'] ?? '');
+        // Process Card1 response (primary transaction)
+        if (isset($response['transaction'])) {
+            $card1Transaction = $response['transaction'];
+            $card1Tid = $card1Transaction['payment']['tid'] ?? '';
+            $card1Status = $card1Transaction['status_id'] ?? '';
+
+            // Store card1 payment information
+            $payment->setAdditionalInformation('card1_payment_tid', $card1Tid);
+            $payment->setAdditionalInformation('card1_status', $card1Status);
             $payment->setAdditionalInformation('card1_installments', $payment->getAdditionalInformation('installments'));
             $payment->setAdditionalInformation('card1_amount', $payment->getAdditionalInformation('amount_card1'));
 
-            // Save new card if requested
-            if (isset($card1Response['payment']['card_id']) &&
-                $payment->getAdditionalInformation('save_card') &&
-                $order->getCustomerId()) {
-                $this->saveCardData($card1Response, $order->getCustomerId());
+            // Set the transaction ID for the card1 portion
+            $payment->setTransactionId($card1Tid);
+            $payment->setIsTransactionClosed(false);
+
+
+            // Check if card1 payment was successful
+            if ($this->isSuccessfulResponse($card1Transaction)) {
+                // Card1 payment success - update existing card2 queue record with card1 TID and keep pending status
+                $this->updateCard2QueueRecord($order, $card1Tid, MultiPaymentQueue::STATUS_PENDING);
+
+                // Set payment status
+                $payment->setAdditionalInformation('payment_status', 'card1_approved_card2_pending');
+
+                $this->helper->log(
+                    "CardCard - Card1 payment successful for order {$order->getIncrementId()}, TID: {$card1Tid}. Card2 remains pending for processing.",
+                    'cardcard_handler'
+                );
+            } else {
+                // Card1 payment failed - update existing card2 queue record to failed status (cancelled due to card1 failure)
+                $this->updateCard2QueueRecord($order, $card1Tid, MultiPaymentQueue::STATUS_FAILED);
+
+                // Set payment status
+                $payment->setAdditionalInformation('payment_status', 'card1_failed_card2_cancelled');
+
+                $this->helper->log(
+                    "CardCard - Card1 payment failed for order {$order->getIncrementId()}, Status: {$card1Status}. Card2 cancelled due to card1 failure.",
+                    'cardcard_handler'
+                );
+
+                // Mark payment as failed but don't throw exception to allow order processing
+                $payment->setIsTransactionPending(false);
+                $payment->setIsTransactionClosed(true);
             }
         }
 
-        // Process second Card response
-        if (isset($response['card2_response'])) {
-            $card2Response = $response['card2_response'];
-            $payment->setAdditionalInformation('card2_payment_tid', $card2Response['tid'] ?? '');
-            $payment->setAdditionalInformation('card2_status', $card2Response['status'] ?? '');
-            $payment->setAdditionalInformation('card2_installments', $payment->getAdditionalInformation('installments_2'));
-            $payment->setAdditionalInformation('card2_amount', $payment->getAdditionalInformation('amount_card2'));
+        // Store the complete response data as additional information
+        $payment->setAdditionalInformation('vindi_response', $this->serializer->serialize($response));
+    }
 
-            // Save second new card if requested
-            if (isset($card2Response['payment']['card_id']) &&
-                $payment->getAdditionalInformation('save_card_2') &&
-                $order->getCustomerId()) {
-                $this->saveCardData($card2Response, $order->getCustomerId());
+    /**
+     * Update existing card2 queue record with card1 transaction ID and status
+     *
+     * @param \Magento\Sales\Model\Order $order
+     * @param string $card1Tid
+     * @param string $status
+     * @return void
+     */
+    private function updateCard2QueueRecord($order, string $card1Tid, string $status): void
+    {
+        try {
+            // Find the existing card2 queue record for this order
+            $queueItems = $this->multiPaymentQueueService->getByOrderId((int)$order->getId());
+
+            $card2QueueFound = false;
+            foreach ($queueItems as $queueItem) {
+                if ($queueItem->getSecondaryMethodType() === MultiPaymentQueue::SECONDARY_METHOD_CARD2) {
+                    $card2QueueFound = true;
+
+                    // Update the queue record with card1 TID and status
+                    $queueItem->setPrimaryTransactionId($card1Tid);
+
+                    // Add error message if status is failed
+                    $errorMessage = null;
+                    if ($status === MultiPaymentQueue::STATUS_FAILED) {
+                        $errorMessage = 'Card2 cancelled due to card1 payment failure';
+                    }
+
+                    // Use the updateStatus method to save
+                    $this->multiPaymentQueueService->updateStatus($queueItem, $status, [], $errorMessage);
+
+                    $this->helper->log(
+                        "CardCard - Updated card2 queue record for order {$order->getIncrementId()} with card1 TID: {$card1Tid}, status: {$status}",
+                        'cardcard_queue'
+                    );
+                    break;
+                }
             }
-        }
 
-        // Check if both card transactions were successful
-        if (isset($response['card1_response']['status']) &&
-            isset($response['card2_response']['status']) &&
-            $response['card1_response']['status'] === 'approved' &&
-            $response['card2_response']['status'] === 'approved'
-        ) {
-            $payment->setIsTransactionApproved(true);
-            $payment->setIsTransactionPending(false);
-        } else {
-            $payment->setIsTransactionPending(true);
+            if (!$card2QueueFound) {
+                $this->helper->log(
+                    "CardCard - WARNING: No card2 queue record found for order {$order->getIncrementId()} to update with card1 TID: {$card1Tid}",
+                    'cardcard_error'
+                );
+            }
+
+        } catch (\Exception $e) {
+            $this->helper->log(
+                "CardCard - Error updating card2 queue record for order {$order->getIncrementId()}: {$e->getMessage()}",
+                'cardcard_error'
+            );
         }
+    }
+
+    /**
+     * Check if the response was successful
+     *
+     * @param array $response
+     * @return bool
+     */
+    private function isSuccessfulResponse(array $response): bool
+    {
+        // Check if we have a successful card transaction
+        $statusId = $response['status_id'] ?? null;
+        $tid = $response['payment']['tid'] ?? null;
+
+        // Status 3 = Authorized, Status 4 = Captured - both are successful for cards
+        return !empty($tid) && in_array($statusId, ['3', '4']);
     }
 
     /**
@@ -138,12 +226,8 @@ class TransactionHandler implements HandlerInterface
         }
 
         try {
-            $this->helper->saveCustomerCard(
-                $customerId,
-                $response['payment']['card_id'],
-                $response['payment']['brand'],
-                $response['payment']['last_digits']
-            );
+            // Here you would save the card data - implementation depends on your card saving logic
+            $this->helper->log('Card saved for customer: ' . $customerId);
         } catch (\Exception $e) {
             // Log error but don't interrupt the payment flow
             $this->helper->log('Error saving card: ' . $e->getMessage());

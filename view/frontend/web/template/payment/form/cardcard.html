@@ -43,8 +43,7 @@
                         attr: {
                             class: 'fieldset payment items ccard ' + getCode(),
                             id: 'payment_form_' + getCode()
-                        },
-                        visible: showCardData
+                        }
                     ">
 
                     <!--=== Pagamento com o 1º Cartão de Crédito ===-->
@@ -95,6 +94,7 @@
                     <!-- /ko -->
 
                     <div class="field number cc-number required vindi-cc-number-container" data-bind="visible: !selectedPaymentProfile()">
+                        <label class="label"><span data-bind="i18n: 'Número do Cartão'"></span></label>
                         <div class="credit-card-types-container">
                             <ul class="credit-card-types">
                                 <!-- ko foreach: { data: getCcAvailableTypesValues(), as: 'item' } -->
@@ -118,15 +118,14 @@
                         </div>
                         <div class="control">
                             <input
-                                type="number"
-                                name="payment[first_cc_number]"
+                                type="text"
+                                name="payment[cc_number]"
                                 class="input-text-vindi"
                                 data-bind="attr: {
-                                    id: getCode() + '_first_cc_number',
+                                    id: getCode() + '_cc_number',
                                     placeholder: $t('Número do Cartão'),
                                     'data-validate': JSON.stringify({'required-number':true})
                                 },
-                                change: updateInstallmentsValues,
                                 enable: isActive($parents),
                                 value: vindiCreditCardNumber,
                                 valueUpdate: 'keyup'"
@@ -135,16 +134,16 @@
                     </div>
 
                     <div class="field number required" data-bind="visible: !selectedPaymentProfile()">
-                        <label class="label" data-bind="attr: {for: getCode() + '_first_cc_number'}">
+                        <label class="label" data-bind="attr: {for: getCode() + '_cc_owner'}">
                             <span data-bind="i18n: 'Nome no Cartão'"></span>
                         </label>
                         <div class="control">
                             <input
                                 type="text"
-                                name="payment[first_cc_number]"
+                                name="payment[cc_owner]"
                                 class="input-text-vindi"
                                 data-bind="attr: {
-                                    id: getCode() + '_first_cc_number',
+                                    id: getCode() + '_cc_owner',
                                     placeholder: $t('Nome no Cartão'),
                                     'data-validate': JSON.stringify({'required':true})
                                 },
@@ -156,18 +155,18 @@
                     </div>
 
                     <div class="field number required vindi-cc-exp" data-bind="visible: !selectedPaymentProfile()">
-                        <label class="label" data-bind="attr: {for: getCode() + '_first_cc_number'}">
+                        <label class="label" data-bind="attr: {for: getCode() + '_cc_exp_date'}">
                             <span data-bind="i18n: 'Data de Validade'"></span>
                         </label>
                         <div class="control">
                             <input
                                 type="text"
-                                name="payment[first_cc_number]"
+                                name="payment[cc_exp_date]"
                                 class="input-text-vindi"
                                 pattern="[0-9]*"
                                 inputmode="numeric"
                                 data-bind="attr: {
-                                    id: getCode() + '_first_cc_number',
+                                    id: getCode() + '_cc_exp_date',
                                     placeholder: $t('MM/AA'),
                                     'data-validate': JSON.stringify({'required-number':true})
                                 },
@@ -179,17 +178,39 @@
                     </div>
 
                     <div class="field number required" data-bind="visible: !selectedPaymentProfile()">
-                        <label class="label" data-bind="attr: {for: getCode() + '_first_cc_number'}">
+                        <label class="label" data-bind="attr: {for: getCode() + '_cc_cid'}">
                             <span data-bind="i18n: 'CVV'"></span>
                         </label>
                         <div class="control">
                             <input
                                 type="text"
-                                name="payment[first_cc_number]"
+                                name="payment[cc_cid]"
                                 class="input-text-vindi"
                                 maxlength="4"
                                 data-bind="attr: {
-                                    id: getCode() + '_first_cc_number',
+                                    id: getCode() + '_cc_cid',
+                                    placeholder: $t('CVV'),
+                                    'data-validate': JSON.stringify({'required-number':true})
+                                },
+                                enable: isActive($parents),
+                                value: creditCardVerificationNumber"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- CVV field for saved cards (required) -->
+                    <div class="field number required" data-bind="visible: selectedPaymentProfile()">
+                        <label class="label" data-bind="attr: {for: getCode() + '_first_cc_cid_saved'}">
+                            <span data-bind="i18n: 'CVV'"></span>
+                        </label>
+                        <div class="control">
+                            <input
+                                type="text"
+                                name="payment[first_cc_cid]"
+                                class="input-text-vindi"
+                                maxlength="4"
+                                data-bind="attr: {
+                                    id: getCode() + '_first_cc_cid_saved',
                                     placeholder: $t('CVV'),
                                     'data-validate': JSON.stringify({'required-number':true})
                                 },
@@ -282,6 +303,7 @@
                     <!-- /ko -->
 
                     <div class="field number cc-number required vindi-cc-number-container" data-bind="visible: !secondSelectedPaymentProfile()">
+                        <label class="label"><span data-bind="i18n: 'Número do Cartão'"></span></label>
                         <div class="credit-card-types-container">
                             <ul class="credit-card-types">
                                 <!-- ko foreach: { data: getCcAvailableTypesValues(), as: 'item' } -->
@@ -305,7 +327,7 @@
                         </div>
                         <div class="control">
                             <input
-                                type="number"
+                                type="text"
                                 name="payment[second_cc_number]"
                                 class="input-text-vindi"
                                 data-bind="attr: {
@@ -313,7 +335,6 @@
                                     placeholder: $t('Número do Cartão'),
                                     'data-validate': JSON.stringify({'required-number':true})
                                 },
-                                change: updateSecondInstallmentsValues,
                                 enable: isActive($parents),
                                 value: secondVindiCreditCardNumber,
                                 valueUpdate: 'keyup'"
@@ -322,16 +343,16 @@
                     </div>
 
                     <div class="field number required" data-bind="visible: !secondSelectedPaymentProfile()">
-                        <label class="label" data-bind="attr: {for: getCode() + '_second_cc_number'}">
+                        <label class="label" data-bind="attr: {for: getCode() + '_second_cc_owner'}">
                             <span data-bind="i18n: 'Nome no Cartão'"></span>
                         </label>
                         <div class="control">
                             <input
                                 type="text"
-                                name="payment[second_cc_number]"
+                                name="payment[second_cc_owner]"
                                 class="input-text-vindi"
                                 data-bind="attr: {
-                                    id: getCode() + '_second_cc_number',
+                                    id: getCode() + '_second_cc_owner',
                                     placeholder: $t('Nome no Cartão'),
                                     'data-validate': JSON.stringify({'required':true})
                                 },
@@ -343,18 +364,18 @@
                     </div>
 
                     <div class="field number required vindi-cc-exp" data-bind="visible: !secondSelectedPaymentProfile()">
-                        <label class="label" data-bind="attr: {for: getCode() + '_second_cc_number'}">
+                        <label class="label" data-bind="attr: {for: getCode() + '_second_cc_exp_date'}">
                             <span data-bind="i18n: 'Data de Validade'"></span>
                         </label>
                         <div class="control">
                             <input
                                 type="text"
-                                name="payment[second_cc_number]"
+                                name="payment[second_cc_exp_date]"
                                 class="input-text-vindi"
                                 pattern="[0-9]*"
                                 inputmode="numeric"
                                 data-bind="attr: {
-                                    id: getCode() + '_second_cc_number',
+                                    id: getCode() + '_second_cc_exp_date',
                                     placeholder: $t('MM/AA'),
                                     'data-validate': JSON.stringify({'required-number':true})
                                 },
@@ -366,17 +387,39 @@
                     </div>
 
                     <div class="field number required" data-bind="visible: !secondSelectedPaymentProfile()">
-                        <label class="label" data-bind="attr: {for: getCode() + '_second_cc_number'}">
+                        <label class="label" data-bind="attr: {for: getCode() + '_second_cc_cid'}">
                             <span data-bind="i18n: 'CVV'"></span>
                         </label>
                         <div class="control">
                             <input
                                 type="text"
-                                name="payment[second_cc_number]"
+                                name="payment[second_cc_cid]"
                                 class="input-text-vindi"
                                 maxlength="4"
                                 data-bind="attr: {
-                                    id: getCode() + '_second_cc_number',
+                                    id: getCode() + '_second_cc_cid',
+                                    placeholder: $t('CVV'),
+                                    'data-validate': JSON.stringify({'required-number':true})
+                                },
+                                enable: isActive($parents),
+                                value: secondCreditCardVerificationNumber"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- CVV field for saved cards (required) -->
+                    <div class="field number required" data-bind="visible: secondSelectedPaymentProfile()">
+                        <label class="label" data-bind="attr: {for: getCode() + '_second_cc_cid_saved'}">
+                            <span data-bind="i18n: 'CVV'"></span>
+                        </label>
+                        <div class="control">
+                            <input
+                                type="text"
+                                name="payment[second_cc_cid]"
+                                class="input-text-vindi"
+                                maxlength="4"
+                                data-bind="attr: {
+                                    id: getCode() + '_second_cc_cid_saved',
                                     placeholder: $t('CVV'),
                                     'data-validate': JSON.stringify({'required-number':true})
                                 },

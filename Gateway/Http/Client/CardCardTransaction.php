@@ -92,35 +92,24 @@ class CardCardTransaction implements ClientInterface
     public function placeRequest(TransferInterface $transferObject): array
     {
         $request = $transferObject->getBody();
-
-        // Log the request data with sensitive information masked
         $this->logRequest($request);
-
         $storeId = $request['client_config']['store_id'] ?? null;
 
-        // Process first card payment request
-        $card1Response = $this->processCard1Payment($request['card1_request'], $storeId);
+        // Process only the first card payment (primary transaction)
+        $card1Response = $this->processCard1Payment($request['card_request'], $storeId);
 
-        // If first card payment was successful, process second card payment
-        if ($this->isSuccessfulCardResponse($card1Response)) {
-            $card2Response = $this->processCard2Payment($request['card2_request'], $storeId);
-
-            // If second card payment failed, we need to refund the first card payment
-            if (!$this->isSuccessfulCardResponse($card2Response)) {
-                $this->refundCardPayment($card1Response, $storeId);
-                return ['error' => true, 'card1_response' => $card1Response, 'card2_response' => $card2Response];
-            }
-
-            // Both transactions were successful
+        if ($this->isSuccessfulCard1Response($card1Response)) {
             return [
                 'success' => true,
-                'card1_response' => $card1Response,
-                'card2_response' => $card2Response
+                'transaction' => $card1Response
             ];
         }
 
-        // First card payment failed, return the error
-        return ['error' => true, 'card1_response' => $card1Response];
+        // First card payment failed
+        return [
+            'error' => true,
+            'transaction' => $card1Response
+        ];
     }
 
     /**
@@ -249,6 +238,19 @@ class CardCardTransaction implements ClientInterface
             ]);
             return false;
         }
+    }
+
+    /**
+     * Check if the first card response was successful
+     *
+     * @param array $response
+     * @return bool
+     */
+    private function isSuccessfulCard1Response(array $response): bool
+    {
+        return isset($response['status_id']) &&
+               in_array($response['status_id'], ['3', '4']) &&
+               isset($response['payment']['tid']);
     }
 
     /**

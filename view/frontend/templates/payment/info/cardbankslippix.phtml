@@ -1,0 +1,220 @@
+<?php
+/**
+ * DISCLAIMER
+ *
+ * Do not edit or add to this file if you wish to upgrade this extension to newer
+ * version in the future.
+ *
+ * @category    Vindi
+ * @package     Vindi_VP
+ */
+// @codingStandardsIgnoreFile
+
+/**
+ * @var \Vindi\VP\Block\Info\CardBankSlipPix $block
+ * @see \Magento\Payment\Block\Info
+ */
+
+/** @var \Magento\Framework\Escaper $escaper */
+
+$specificInfo = $block->getSpecificInformation();
+$title = $block->escapeHtml($block->getMethod()->getTitle());
+$payment = $block->getInfo();
+$hasInvoice = $payment->getOrder()->hasInvoices();
+
+$cardAmount = $block->getCardAmount();
+$cardTid = $block->getCardTid();
+$cardStatus = $block->getCardStatus();
+$cardInstallments = $block->getCardInstallments();
+$bolepixAmount = $block->getBolepixAmount();
+$paymentStatus = $block->getPaymentStatus();
+$isCardSuccessful = $block->isCardSuccessful();
+$isMixedStatus = $block->isMixedStatus();
+
+// Bolepix data (will be available after secondary payment processing)
+$bankSlipUrl = $block->getBankSlipUrl();
+$pixEmv = $block->getPixEmv();
+$pixQRCodeImage = $block->getPixQRCodeImage();
+?>
+
+<dl class="payment-method vindi-vp-content">
+    <dt class="title">
+        <?= $block->escapeHtml($title) ?>
+    </dt>
+
+    <dd class="content">
+        <div class="vindi-vp-cardbankslippix">
+
+            <!-- Payment Status Overview -->
+            <div class="payment-status-overview">
+                <h4><?= $block->escapeHtml(__('Payment Status')) ?></h4>
+                <p class="status-<?= $isCardSuccessful ? 'success' : 'error' ?>">
+                    <strong><?= $block->escapeHtml($paymentStatus) ?></strong>
+                </p>
+            </div>
+
+            <!-- Card Payment Information -->
+            <div class="card-payment-info">
+                <h4><?= $block->escapeHtml(__('Card Payment')) ?></h4>
+                <table class="data table">
+                    <tr>
+                        <th scope="row"><?= $block->escapeHtml(__('Amount')) ?></th>
+                        <td><?= $block->escapeHtml($cardAmount) ?></td>
+                    </tr>
+                    <?php if ($cardTid): ?>
+                    <tr>
+                        <th scope="row"><?= $block->escapeHtml(__('Transaction ID')) ?></th>
+                        <td><?= $block->escapeHtml($cardTid) ?></td>
+                    </tr>
+                    <?php endif; ?>
+                    <tr>
+                        <th scope="row"><?= $block->escapeHtml(__('Status')) ?></th>
+                        <td class="status-<?= $isCardSuccessful ? 'success' : 'error' ?>">
+                            <?= $block->escapeHtml($cardStatus) ?>
+                        </td>
+                    </tr>
+                    <?php if ($cardInstallments > 1): ?>
+                    <tr>
+                        <th scope="row"><?= $block->escapeHtml(__('Installments')) ?></th>
+                        <td><?= $block->escapeHtml($cardInstallments) ?>x</td>
+                    </tr>
+                    <?php endif; ?>
+                </table>
+            </div>
+
+            <!-- Bolepix Payment Information -->
+            <div class="bolepix-payment-info">
+                <h4><?= $block->escapeHtml(__('Bolepix Payment')) ?></h4>
+                <table class="data table">
+                    <tr>
+                        <th scope="row"><?= $block->escapeHtml(__('Amount')) ?></th>
+                        <td><?= $block->escapeHtml($bolepixAmount) ?></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?= $block->escapeHtml(__('Status')) ?></th>
+                        <td>
+                            <?php if ($isMixedStatus): ?>
+                                <span class="status-pending"><?= $block->escapeHtml(__('Pending Processing')) ?></span>
+                            <?php elseif ($bankSlipUrl || $pixEmv): ?>
+                                <span class="status-success"><?= $block->escapeHtml(__('Available for Payment')) ?></span>
+                            <?php else: ?>
+                                <span class="status-pending"><?= $block->escapeHtml(__('Processing...')) ?></span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- Bank Slip Link -->
+                <?php if ($bankSlipUrl): ?>
+                <div class="bankslip-section">
+                    <h5><?= $block->escapeHtml(__('Bank Slip')) ?></h5>
+                    <p>
+                        <a href="<?= $block->escapeUrl($bankSlipUrl) ?>"
+                           target="_blank"
+                           class="action primary">
+                            <?= $block->escapeHtml(__('Download Bank Slip')) ?>
+                        </a>
+                    </p>
+                </div>
+                <?php endif; ?>
+
+                <!-- PIX QR Code -->
+                <?php if ($pixEmv): ?>
+                <div class="pix-section">
+                    <h5><?= $block->escapeHtml(__('PIX Payment')) ?></h5>
+
+                    <?php if ($pixQRCodeImage): ?>
+                    <div class="qr-code-image">
+                        <img src="<?= $block->escapeUrl($pixQRCodeImage) ?>"
+                             alt="<?= $block->escapeHtml(__('PIX QR Code')) ?>"
+                             style="max-width: 200px; height: auto;" />
+                    </div>
+                    <?php endif; ?>
+
+                    <div class="pix-emv-code">
+                        <label><?= $block->escapeHtml(__('PIX Code:')) ?></label>
+                        <textarea readonly style="width: 100%; height: 80px; font-family: monospace; font-size: 12px;"><?= $block->escapeHtml($pixEmv) ?></textarea>
+                        <button type="button" onclick="navigator.clipboard.writeText(this.previousElementSibling.value)" class="action secondary">
+                            <?= $block->escapeHtml(__('Copy PIX Code')) ?>
+                        </button>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+                <!-- Information for pending Bolepix -->
+                <?php if ($isMixedStatus && !$bankSlipUrl && !$pixEmv): ?>
+                <div class="pending-info">
+                    <p><?= $block->escapeHtml(__('Your card payment was approved successfully. The Bolepix (Bank Slip + PIX) payment options will be processed shortly and you will receive the payment instructions via email.')) ?></p>
+                </div>
+                <?php endif; ?>
+            </div>
+
+        </div>
+    </dd>
+</dl>
+
+<style>
+.vindi-vp-cardbankslippix {
+    margin: 15px 0;
+}
+
+.vindi-vp-cardbankslippix .payment-status-overview,
+.vindi-vp-cardbankslippix .card-payment-info,
+.vindi-vp-cardbankslippix .bolepix-payment-info {
+    margin-bottom: 20px;
+    padding: 15px;
+    border: 1px solid #e1e1e1;
+    border-radius: 5px;
+}
+
+.vindi-vp-cardbankslippix h4 {
+    margin: 0 0 10px 0;
+    color: #333;
+    border-bottom: 1px solid #e1e1e1;
+    padding-bottom: 5px;
+}
+
+.vindi-vp-cardbankslippix h5 {
+    margin: 15px 0 10px 0;
+    color: #666;
+}
+
+.vindi-vp-cardbankslippix .status-success {
+    color: #4caf50;
+    font-weight: bold;
+}
+
+.vindi-vp-cardbankslippix .status-error {
+    color: #f44336;
+    font-weight: bold;
+}
+
+.vindi-vp-cardbankslippix .status-pending {
+    color: #ff9800;
+    font-weight: bold;
+}
+
+.vindi-vp-cardbankslippix .bankslip-section,
+.vindi-vp-cardbankslippix .pix-section {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #e1e1e1;
+}
+
+.vindi-vp-cardbankslippix .qr-code-image {
+    text-align: center;
+    margin: 10px 0;
+}
+
+.vindi-vp-cardbankslippix .pix-emv-code {
+    margin-top: 10px;
+}
+
+.vindi-vp-cardbankslippix .pending-info {
+    padding: 10px;
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 5px;
+    color: #856404;
+}
+</style>

@@ -51,6 +51,11 @@
         <observer name="vindi_vp_send_tracking" instance="Vindi\VP\Observer\Sales\SendTrackingData" />
     </event>
 
+    <event name="sales_order_save_after">
+        <observer name="vindi_vp_create_pix_queue_after_order_save" instance="Vindi\VP\Observer\CreatePixQueueAfterOrderSave" />
+        <observer name="vindi_vp_create_multi_payment_queue_after_order_save" instance="Vindi\VP\Observer\CreateMultiPaymentQueueAfterOrderSave" />
+    </event>
+
     <event name="payment_method_assign_data_vindi_vp_cardpix">
         <observer name="vindi_vp_cardpix_credit_card_assign" instance="Vindi\VP\Observer\CreditCardAssignObserver"/>
     </event>
