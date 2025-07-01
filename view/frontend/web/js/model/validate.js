@@ -2,15 +2,27 @@ define([], function() {
         'use strict';
 
         return {
-            isValidTaxvat(taxvat){
-                if ((taxvat = taxvat.replace(/[^\d]/g,"")).length < 11)
-                    return false
-
-                if (taxvat.length === 11) {
-                    return this.validateCpf(taxvat)
+            isValidTaxvat: function(taxvat) {
+                if (!taxvat || typeof taxvat !== 'string') {
+                    return false;
+                }
+                
+                // Remove formatação
+                taxvat = taxvat.replace(/[^\d]/g, "");
+                
+                if (taxvat.length < 11) {
+                    return false;
                 }
 
-                return this.validateCnpj(taxvat);
+                if (taxvat.length === 11) {
+                    return this.validateCpf(taxvat);
+                }
+
+                if (taxvat.length === 14) {
+                    return this.validateCnpj(taxvat);
+                }
+
+                return false;
             },
 
             validateCpf: function (cpf) {

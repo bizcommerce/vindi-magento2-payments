@@ -467,12 +467,12 @@
                         <div class="control">
                             <input
                                 type="text"
-                                name="payment[pix_taxvat]"
+                                name="payment[taxvat]"
                                 class="input-text-vindi cpf-cnpj"
-                                maxlength="14"
+                                maxlength="18"
                                 data-bind="attr: {
-                                    title: $t('CPF'),
-                                    placeholder: $t('CPF'),
+                                    title: $t('CPF/CNPJ'),
+                                    placeholder: $t('Digite seu CPF ou CNPJ'),
                                     id: getCode() + '_taxvat',
                                     'data-container': getCode() + '-taxvat',
                                     'data-validate': getVatValidation()

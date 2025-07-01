@@ -169,8 +169,13 @@ define(
                     creditCardData.vindiCreditCardNumber = value;
                     console.log('[CARDCARD] Setting creditCardType to:', result.card.type);
                     self.creditCardType(result.card.type);
-                    console.log('[CARDCARD] Calling updateInstallmentsValues from subscriber');
-                    self.updateInstallmentsValues();
+                    console.log('[CARDCARD] Atualizando gerenciador unificado para cartão 1');
+
+                    // Usar o gerenciador unificado ao invés da função antiga
+                    self.DualCardInstallmentManager.updateCard(1, {
+                        type: result.card.type,
+                        amount: parseFloat($('#first_card_amount').val() || 0)
+                    });
                 });
 
                 this.secondVindiCreditCardNumber.subscribe(function (value) {
@@ -191,127 +196,324 @@ define(
                     }
                     console.log('[CARDCARD] Setting secondCreditCardType to:', result.card.type);
                     self.secondCreditCardType(result.card.type);
-                    console.log('[CARDCARD] Calling updateSecondInstallmentsValues from subscriber');
-                    self.updateSecondInstallmentsValues();
+                    console.log('[CARDCARD] Atualizando gerenciador unificado para cartão 2');
+
+                    // Usar o gerenciador unificado ao invés da função antiga
+                    self.DualCardInstallmentManager.updateCard(2, {
+                        type: result.card.type,
+                        amount: parseFloat($('#second_card_amount').val() || 0)
+                    });
                 });
 
                 this.selectedPaymentProfile.subscribe(function (value) {
                     // Para cartão salvo, mostrar apenas campos obrigatórios (CVV)
                     // mas manter o formulário visível
-                    self.updateInstallmentsValues();
+                    if (value) {
+                        self.showCardData(false);
+                    } else {
+                        self.showCardData(true);
+                    }
+                    // Removido: não dispara parcelamento aqui
                 });
 
                 this.secondSelectedPaymentProfile.subscribe(function (value) {
                     // Para segundo cartão salvo, mostrar apenas campos obrigatórios (CVV)
                     // mas manter o formulário visível
-                    self.updateSecondInstallmentsValues();
+                    if (value) {
+                        self.showCardData(false);
+                    } else {
+                        self.showCardData(true);
+                    }
+                    // Removido: não dispara parcelamento aqui
                 });
 
                 // Inicializa e adiciona o loader
                 self.initializeLoader();
                 self.installmentsDisabled(true);
                 self.secondInstallmentsDisabled(true);
-                this.updateInstallmentsValues();
-                this.updateSecondInstallmentsValues();
+
+                // Remover chamadas para funções antigas - agora usamos o gerenciador unificado
+                // this.updateInstallmentsValues();
+                // this.updateSecondInstallmentsValues();
 
                 // Handle first card amount change
-                $(document).on('change', '#first_card_amount', function() {
+                $(document).off('input change', '#first_card_amount');
+                $(document).on('input change', '#first_card_amount', function() {
                     var grandTotal = self.getGrandTotal();
-                    var firstCardAmount = parseFloat($(this).val() || 0);
-                    var secondCardAmount = parseFloat($('#second_card_amount').val() || 0);
-
-                    self.showFirstCardError(false);
-                    self.firstCardErrorMessage('');
-                    $(this).removeClass('error');
-                    self.isFormValid(true);
-
-                    // Validate if the amount is greater than the total
-                    if (firstCardAmount > grandTotal) {
-                        self.showFirstCardError(true);
-                        self.firstCardErrorMessage($t('O valor não pode ser maior que o total do pedido.'));
-                        $(this).addClass('error');
-                        self.isFormValid(false);
-                        return;
-                    }
-
-                    // Validate total of both payment methods
-                    var totalAmount = Math.round((firstCardAmount + secondCardAmount) * 100) / 100;
-                    var roundedGrandTotal = Math.round(grandTotal * 100) / 100;
-
-                    if (totalAmount > roundedGrandTotal + 0.01) { // Adding small tolerance (0.01)
-                        self.showFirstCardError(true);
-                        self.firstCardErrorMessage($t('A soma dos valores dos cartões não pode exceder o total do pedido.'));
-                        $(this).addClass('error');
-                        self.isFormValid(false);
-                        return;
-                    }
-
-                    if (firstCardAmount > 0) {
-                        self.updateInstallmentsValues();
+                    var $first = $('#first_card_amount');
+                    var $second = $('#second_card_amount');
+                    var firstVal = parseFloat($first.val().replace(',', '.') || 0);
+                    if (firstVal > 0 && firstVal <= grandTotal) {
+                        var remaining = Math.max(0, grandTotal - firstVal);
+                        $second.val(remaining.toFixed(2));
+                        $second.prop('disabled', true);
+                        $first.prop('disabled', false);
+                        if (remaining > 0) {
+                            self.DualCardInstallmentManager.updateCard(1, { amount: firstVal });
+                            self.DualCardInstallmentManager.updateCard(2, { amount: remaining });
+                        }
+                    } else if (!firstVal || firstVal === 0) {
+                        $second.val('');
+                        $second.prop('disabled', false);
+                        $first.prop('disabled', false);
+                        self.DualCardInstallmentManager.clearInstallments();
                     }
                 });
-
-                // Handle when first card amount is cleared
-                $(document).on('input', '#first_card_amount', function() {
-                    if (!$(this).val() || $(this).val() === '') {
-                        self.installmentsDisabled(true);
-                        self.hasInstallments(false);
-                        self.installments([]);
-                        self.creditCardInstallments('');
-                        self.showFirstCardError(false);
-                        self.firstCardErrorMessage('');
-                        $(this).removeClass('error');
-                    }
-                });
-
                 // Handle second card amount change
-                $(document).on('change', '#second_card_amount', function() {
+                $(document).off('input change', '#second_card_amount');
+                $(document).on('input change', '#second_card_amount', function() {
                     var grandTotal = self.getGrandTotal();
-                    var secondCardAmount = parseFloat($(this).val() || 0);
-                    var firstCardAmount = parseFloat($('#first_card_amount').val() || 0);
-
-                    self.showSecondCardError(false);
-                    self.secondCardErrorMessage('');
-                    $(this).removeClass('error');
-                    self.isFormValid(true);
-
-                    // Validate if the amount is greater than the total
-                    if (secondCardAmount > grandTotal) {
-                        self.showSecondCardError(true);
-                        self.secondCardErrorMessage($t('O valor não pode ser maior que o total do pedido.'));
-                        $(this).addClass('error');
-                        self.isFormValid(false);
-                        return;
-                    }
-
-                    // Validate total of both payment methods
-                    var totalAmount = Math.round((firstCardAmount + secondCardAmount) * 100) / 100;
-                    var roundedGrandTotal = Math.round(grandTotal * 100) / 100;
-
-                    if (totalAmount > roundedGrandTotal + 0.01) { // Adding small tolerance (0.01)
-                        self.showSecondCardError(true);
-                        self.secondCardErrorMessage($t('A soma dos valores dos cartões não pode exceder o total do pedido.'));
-                        $(this).addClass('error');
-                        self.isFormValid(false);
-                        return;
-                    }
-
-                    if (secondCardAmount > 0) {
-                        self.updateSecondInstallmentsValues();
+                    var $second = $('#second_card_amount');
+                    var $first = $('#first_card_amount');
+                    var secondVal = parseFloat($second.val().replace(',', '.') || 0);
+                    if (secondVal > 0 && secondVal <= grandTotal) {
+                        var remaining = Math.max(0, grandTotal - secondVal);
+                        $first.val(remaining.toFixed(2));
+                        $first.prop('disabled', true);
+                        $second.prop('disabled', false);
+                        if (remaining > 0) {
+                            self.DualCardInstallmentManager.updateCard(2, { amount: secondVal });
+                            self.DualCardInstallmentManager.updateCard(1, { amount: remaining });
+                        }
+                    } else if (!secondVal || secondVal === 0) {
+                        $first.val('');
+                        $first.prop('disabled', false);
+                        $second.prop('disabled', false);
+                        self.DualCardInstallmentManager.clearInstallments();
                     }
                 });
 
-                // Handle when second card amount is cleared
-                $(document).on('input', '#second_card_amount', function() {
-                    if (!$(this).val() || $(this).val() === '') {
-                        self.secondInstallmentsDisabled(true);
-                        self.hasSecondInstallments(false);
-                        self.secondInstallments([]);
-                        self.secondCreditCardInstallments('');
-                        self.showSecondCardError(false);
-                        self.secondCardErrorMessage('');
-                        $(this).removeClass('error');
+                /**
+                 * Dual Card Installments Manager - Gerencia parcelas de forma unificada
+                 */
+                this.DualCardInstallmentManager = {
+                    // Estado centralizado
+                    state: {
+                        card1: { type: null, amount: 0, profile: null },
+                        card2: { type: null, amount: 0, profile: null },
+                        isProcessing: false,
+                        lastRequestHash: null
+                    },
+
+                    // Atualizar dados de um cartão
+                    updateCard: function(cardIndex, data) {
+                        var self = this;
+                        console.log('[DUAL_CARD_MANAGER] Atualizando cartão', cardIndex, ':', data);
+
+                        this.state[`card${cardIndex}`] = Object.assign(this.state[`card${cardIndex}`], data);
+
+                        // Debounce para evitar múltiplas requisições
+                        clearTimeout(this.debounceTimer);
+                        this.debounceTimer = setTimeout(function() {
+                            self.triggerInstallmentUpdate();
+                        }, 800);
+                    },
+
+                    // Verificar se está pronto para buscar parcelas
+                    isReadyForUpdate: function() {
+                        var card1Valid = this.state.card1.amount > 0;
+                        var card2Valid = this.state.card2.amount > 0;
+
+                        return card1Valid || card2Valid;
+                    },
+
+                    // Gerar hash para cache
+                    generateRequestHash: function() {
+                        var data = {
+                            card1: this.state.card1,
+                            card2: this.state.card2
+                        };
+                        return JSON.stringify(data);
+                    },
+
+                    // Disparar atualização de parcelas
+                    triggerInstallmentUpdate: function() {
+                        var self = this;
+
+                        if (this.state.isProcessing) {
+                            console.log('[DUAL_CARD_MANAGER] Já processando, ignorando...');
+                            return;
+                        }
+
+                        if (!this.isReadyForUpdate()) {
+                            console.log('[DUAL_CARD_MANAGER] Não está pronto para atualizar');
+                            this.clearInstallments();
+                            return;
+                        }
+
+                        var requestHash = this.generateRequestHash();
+                        if (requestHash === this.state.lastRequestHash) {
+                            console.log('[DUAL_CARD_MANAGER] Request idêntica, usando cache');
+                            return;
+                        }
+
+                        this.state.isProcessing = true;
+                        this.state.lastRequestHash = requestHash;
+
+                        console.log('[DUAL_CARD_MANAGER] Iniciando busca unificada de parcelas');
+                        this.fetchUnifiedInstallments();
+                    },
+
+                    // Buscar parcelas de forma unificada
+                    fetchUnifiedInstallments: function() {
+                        var self = this;
+                        var parentContext = this.parentContext;
+
+                        // Ativar loading em ambos os cartões
+                        parentContext.isLoadingInstallments(true);
+                        parentContext.isLoadingSecondInstallments(true);
+                        parentContext.installmentsDisabled(true);
+                        parentContext.secondInstallmentsDisabled(true);
+
+                        var url = parentContext.retrieveDualCardInstallmentsUrl();
+                        if (!url) {
+                            console.error('[DUAL_CARD_MANAGER] URL não encontrada');
+                            this.handleError('URL não encontrada');
+                            return;
+                        }
+
+                        // Preparar dados da requisição
+                        var requestBody = this.buildRequestBody();
+
+                        console.log('[DUAL_CARD_MANAGER] Fazendo requisição unificada:', url);
+                        console.log('[DUAL_CARD_MANAGER] Dados da requisição:', JSON.stringify(requestBody, null, 2));
+
+                        fetch(url, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(requestBody)
+                        }).then(function(response) {
+                            console.log('[DUAL_CARD_MANAGER] Resposta recebida - Status:', response.status);
+
+                            if (!response.ok) {
+                                throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+                            }
+
+                            return response.json();
+                        }).then(function(data) {
+                            console.log('[DUAL_CARD_MANAGER] Dados recebidos:', data);
+                            self.processUnifiedResponse(data);
+                        }).catch(function(error) {
+                            console.error('[DUAL_CARD_MANAGER] Erro na requisição:', error);
+                            self.handleError(error.message);
+                        }).finally(function() {
+                            self.state.isProcessing = false;
+                            parentContext.isLoadingInstallments(false);
+                            parentContext.isLoadingSecondInstallments(false);
+                        });
+                    },
+
+                    // Construir corpo da requisição
+                    buildRequestBody: function() {
+                        var parentContext = this.parentContext;
+                        var cards = [];
+
+                        // Adicionar cartão 1 se valor válido
+                        if (this.state.card1.amount > 0) {
+                            cards.push({
+                                card_index: 1,
+                                cc_type: 'VI', // Usar tipo padrão (Visa) já que não é necessário
+                                amount: this.state.card1.amount,
+                                context: 'first_card'
+                            });
+                        }
+
+                        // Adicionar cartão 2 se valor válido
+                        if (this.state.card2.amount > 0) {
+                            cards.push({
+                                card_index: 2,
+                                cc_type: 'VI', // Usar tipo padrão (Visa) já que não é necessário
+                                amount: this.state.card2.amount,
+                                context: 'second_card'
+                            });
+                        }
+
+                        return {
+                            payment_context: 'dual_card',
+                            cards: cards,
+                            total_order_value: parentContext.getGrandTotal()
+                        };
+                    },
+
+                    // Processar resposta unificada
+                    processUnifiedResponse: function(data) {
+                        var parentContext = this.parentContext;
+
+                        if (!data || !data.cards || !Array.isArray(data.cards)) {
+                            console.error('[DUAL_CARD_MANAGER] Resposta inválida:', data);
+                            this.handleError('Resposta inválida do servidor');
+                            return;
+                        }
+
+                        // Processar cada cartão
+                        data.cards.forEach(function(cardData) {
+                            var cardIndex = cardData.card_index;
+                            var installments = cardData.installments || [];
+
+                            console.log('[DUAL_CARD_MANAGER] Processando cartão', cardIndex, '- Parcelas:', installments.length);
+
+                            if (cardIndex === 1) {
+                                parentContext.installments(installments);
+                                parentContext.hasInstallments(installments.length > 0);
+                                parentContext.installmentsDisabled(installments.length === 0);
+                            } else if (cardIndex === 2) {
+                                parentContext.secondInstallments(installments);
+                                parentContext.hasSecondInstallments(installments.length > 0);
+                                parentContext.secondInstallmentsDisabled(installments.length === 0);
+                            }
+                        });
+
+                        console.log('[DUAL_CARD_MANAGER] Processamento unificado concluído com sucesso');
+                    },
+
+                    // Tratar erros
+                    handleError: function(message) {
+                        var parentContext = this.parentContext;
+
+                        console.error('[DUAL_CARD_MANAGER] Erro:', message);
+
+                        // Limpar parcelas em caso de erro
+                        this.clearInstallments();
+                    },
+
+                    // Limpar parcelas
+                    clearInstallments: function() {
+                        var parentContext = this.parentContext;
+
+                        parentContext.installments([]);
+                        parentContext.hasInstallments(false);
+                        parentContext.installmentsDisabled(true);
+
+                        parentContext.secondInstallments([]);
+                        parentContext.hasSecondInstallments(false);
+                        parentContext.secondInstallmentsDisabled(true);
+                    },
+
+                    // Inicializar com contexto pai
+                    init: function(parentContext) {
+                        this.parentContext = parentContext;
+                        console.log('[DUAL_CARD_MANAGER] Inicializado');
                     }
+                };
+
+                // Inicializar o gerenciador unificado de parcelas
+                this.DualCardInstallmentManager.init(this);
+
+                // Remover triggers antigos de parcelas em outros campos
+                // Adicionar listeners apenas para os campos de valor dos cartões
+                $(document).off('change keyup blur', '#first_card_amount');
+                $(document).on('change keyup blur', '#first_card_amount', function() {
+                    self.DualCardInstallmentManager.updateCard(1, {
+                        amount: parseFloat($(this).val().replace(',', '.')) || 0
+                    });
+                });
+                $(document).off('change keyup blur', '#second_card_amount');
+                $(document).on('change keyup blur', '#second_card_amount', function() {
+                    self.DualCardInstallmentManager.updateCard(2, {
+                        amount: parseFloat($(this).val().replace(',', '.')) || 0
+                    });
                 });
 
                 return this;
@@ -438,6 +640,8 @@ define(
              * @returns {Object}
              */
             getData: function () {
+                console.log('[CARDCARD] getData() chamado');
+                
                 // Inicializar fingerprint de forma segura
                 this.initializeFingerprint();
 
@@ -449,46 +653,83 @@ define(
                 var secondCcExpYear = '';
                 var secondCcExpDate = this.secondCreditCardExpDate();
 
-                if (typeof ccExpDate !== "undefined" && ccExpDate !== null) {
+                if (typeof ccExpDate !== "undefined" && ccExpDate !== null && ccExpDate !== '') {
                     var ccExpDateFull = ccExpDate.split('/');
-                    ccExpMonth = ccExpDateFull[0];
-                    ccExpYear = ccExpDateFull[1];
+                    ccExpMonth = ccExpDateFull[0] || '';
+                    ccExpYear = ccExpDateFull[1] || '';
                 }
 
-                if (typeof secondCcExpDate !== "undefined" && secondCcExpDate !== null) {
+                if (typeof secondCcExpDate !== "undefined" && secondCcExpDate !== null && secondCcExpDate !== '') {
                     var secondCcExpDateFull = secondCcExpDate.split('/');
-                    secondCcExpMonth = secondCcExpDateFull[0];
-                    secondCcExpYear = secondCcExpDateFull[1];
+                    secondCcExpMonth = secondCcExpDateFull[0] || '';
+                    secondCcExpYear = secondCcExpDateFull[1] || '';
                 }
 
-                return {
+                // Garantir valores seguros para anos
+                var ccExpYearFinal = '';
+                var secondCcExpYearFinal = '';
+                
+                if (ccExpYear) {
+                    ccExpYearFinal = ccExpYear.length === 4 ? ccExpYear : '20' + ccExpYear;
+                }
+                
+                if (secondCcExpYear) {
+                    secondCcExpYearFinal = secondCcExpYear.length === 4 ? secondCcExpYear : '20' + secondCcExpYear;
+                }
+
+                // Obter valores dos campos de valor
+                var firstCardAmount = $('#first_card_amount').val() || '0';
+                var secondCardAmount = $('#second_card_amount').val() || '0';
+
+                // Validar se há dados válidos para os cartões
+                var hasFirstCard = this.vindiCreditCardNumber() && this.creditCardOwner() && ccExpMonth && ccExpYear;
+                var hasSecondCard = this.secondVindiCreditCardNumber() && this.secondCreditCardOwner() && secondCcExpMonth && secondCcExpYear;
+
+                console.log('[CARDCARD] Dados do primeiro cartão:', {
+                    hasCard: hasFirstCard,
+                    number: this.vindiCreditCardNumber() ? 'XXXX-' + this.vindiCreditCardNumber().slice(-4) : 'vazio',
+                    owner: this.creditCardOwner(),
+                    amount: firstCardAmount
+                });
+
+                console.log('[CARDCARD] Dados do segundo cartão:', {
+                    hasCard: hasSecondCard,
+                    number: this.secondVindiCreditCardNumber() ? 'XXXX-' + this.secondVindiCreditCardNumber().slice(-4) : 'vazio',
+                    owner: this.secondCreditCardOwner(),
+                    amount: secondCardAmount
+                });
+
+                var data = {
                     'method': this.item.method,
                     'additional_data': {
-                        'payment_profile': this.selectedPaymentProfile(),
-                        'second_payment_profile': this.secondSelectedPaymentProfile(),
-                        'taxvat': this.taxvat(),
-                        'cc_cid': this.creditCardVerificationNumber(),
-                        'cc_cid_2': this.secondCreditCardVerificationNumber(),
-                        'cc_type': this.mapCardType(this.creditCardType()),
-                        'cc_type_2': this.mapCardType(this.secondCreditCardType()),
+                        'payment_profile': this.selectedPaymentProfile() || '',
+                        'second_payment_profile': this.secondSelectedPaymentProfile() || '',
+                        'taxvat': this.taxvat() || '',
+                        'cc_cid': this.creditCardVerificationNumber() || '',
+                        'cc_cid_2': this.secondCreditCardVerificationNumber() || '',
+                        'cc_type': this.mapCardType(this.creditCardType()) || '',
+                        'cc_type_2': this.mapCardType(this.secondCreditCardType()) || '',
                         'cc_exp_month': ccExpMonth,
                         'cc_exp_month_2': secondCcExpMonth,
-                        'cc_exp_year': ccExpYear && ccExpYear.length === 4 ? ccExpYear : '20' + ccExpYear,
-                        'cc_exp_year_2': secondCcExpYear && secondCcExpYear.length === 4 ? secondCcExpYear : '20' + secondCcExpYear,
-                        'cc_number': this.vindiCreditCardNumber(),
-                        'cc_number_2': this.secondVindiCreditCardNumber(),
-                        'cc_owner': this.creditCardOwner(),
-                        'cc_owner_2': this.secondCreditCardOwner(),
-                        'installments': this.creditCardInstallments(),
-                        'installments_2': this.secondCreditCardInstallments(),
-                        'amount_card1': $('#first_card_amount').val(),
-                        'amount_card2': $('#second_card_amount').val(),
+                        'cc_exp_year': ccExpYearFinal,
+                        'cc_exp_year_2': secondCcExpYearFinal,
+                        'cc_number': this.vindiCreditCardNumber() || '',
+                        'cc_number_2': this.secondVindiCreditCardNumber() || '',
+                        'cc_owner': this.creditCardOwner() || '',
+                        'cc_owner_2': this.secondCreditCardOwner() || '',
+                        'installments': this.creditCardInstallments() || '1',
+                        'installments_2': this.secondCreditCardInstallments() || '1',
+                        'amount_card1': firstCardAmount,
+                        'amount_card2': secondCardAmount,
                         'save_card': this.saveCard() ? 1 : 0,
                         'save_card_2': this.secondSaveCard() ? 1 : 0,
-                        'fingerprint': this.getFingerprint(),
-                        'fingerprint_2': this.getFingerprint()
+                        'fingerprint': this.getFingerprint() || '',
+                        'fingerprint_2': this.getFingerprint() || ''
                     }
                 };
+
+                console.log('[CARDCARD] Dados finais a serem enviados:', JSON.stringify(data, null, 2));
+                return data;
             },
 
             /**
@@ -587,12 +828,20 @@ define(
                 var self = this;
 
                 try {
+                    console.log('[CARDCARD] Iniciando validação do formulário');
+
                     var $form = $('#' + 'form_' + this.getCode());
 
                     // Validate card amounts
                     var firstCardAmount = parseFloat($('#first_card_amount').val() || 0);
                     var secondCardAmount = parseFloat($('#second_card_amount').val() || 0);
                     var grandTotal = this.getGrandTotal();
+
+                    console.log('[CARDCARD] Valores:', {
+                        firstCard: firstCardAmount,
+                        secondCard: secondCardAmount,
+                        total: grandTotal
+                    });
 
                     // Reset error states
                     this.showFirstCardError(false);
@@ -640,19 +889,102 @@ define(
                         return false;
                     }
 
-                    // Handle manual form validation instead of using jQuery validation plugin
-                    if ($form && $form.length) {
-                        var validationResult = $form.validation() && $form.validation('isValid');
-
-                        if (!validationResult) {
-                            return false;
+                    // Validação dos campos obrigatórios do primeiro cartão
+                    if (firstCardAmount > 0) {
+                        // Se cartão salvo estiver selecionado, só validar CVV
+                        if (this.selectedPaymentProfile()) {
+                            if (!this.creditCardVerificationNumber() || this.creditCardVerificationNumber().length < 3) {
+                                console.error('[CARDCARD] CVV do primeiro cartão salvo é obrigatório');
+                                this.showFirstCardError(true);
+                                this.firstCardErrorMessage($t('CVV do primeiro cartão é obrigatório.'));
+                                return false;
+                            }
+                        } else {
+                            // Validar campos de cartão novo
+                            if (!this.vindiCreditCardNumber() || this.vindiCreditCardNumber().length < 13) {
+                                console.error('[CARDCARD] Número do primeiro cartão inválido');
+                                this.showFirstCardError(true);
+                                this.firstCardErrorMessage($t('Número do primeiro cartão é obrigatório.'));
+                                return false;
+                            }
+                            
+                            if (!this.creditCardOwner() || this.creditCardOwner().trim() === '') {
+                                console.error('[CARDCARD] Nome do portador do primeiro cartão é obrigatório');
+                                this.showFirstCardError(true);
+                                this.firstCardErrorMessage($t('Nome do portador do primeiro cartão é obrigatório.'));
+                                return false;
+                            }
+                            
+                            if (!this.creditCardExpDate() || this.creditCardExpDate().length < 5) {
+                                console.error('[CARDCARD] Data de vencimento do primeiro cartão é obrigatória');
+                                this.showFirstCardError(true);
+                                this.firstCardErrorMessage($t('Data de vencimento do primeiro cartão é obrigatória.'));
+                                return false;
+                            }
+                            
+                            if (!this.creditCardVerificationNumber() || this.creditCardVerificationNumber().length < 3) {
+                                console.error('[CARDCARD] CVV do primeiro cartão é obrigatório');
+                                this.showFirstCardError(true);
+                                this.firstCardErrorMessage($t('CVV do primeiro cartão é obrigatório.'));
+                                return false;
+                            }
                         }
                     }
 
+                    // Validação dos campos obrigatórios do segundo cartão
+                    if (secondCardAmount > 0) {
+                        // Se cartão salvo estiver selecionado, só validar CVV
+                        if (this.secondSelectedPaymentProfile()) {
+                            if (!this.secondCreditCardVerificationNumber() || this.secondCreditCardVerificationNumber().length < 3) {
+                                console.error('[CARDCARD] CVV do segundo cartão salvo é obrigatório');
+                                this.showSecondCardError(true);
+                                this.secondCardErrorMessage($t('CVV do segundo cartão é obrigatório.'));
+                                return false;
+                            }
+                        } else {
+                            // Validar campos de cartão novo
+                            if (!this.secondVindiCreditCardNumber() || this.secondVindiCreditCardNumber().length < 13) {
+                                console.error('[CARDCARD] Número do segundo cartão inválido');
+                                this.showSecondCardError(true);
+                                this.secondCardErrorMessage($t('Número do segundo cartão é obrigatório.'));
+                                return false;
+                            }
+                            
+                            if (!this.secondCreditCardOwner() || this.secondCreditCardOwner().trim() === '') {
+                                console.error('[CARDCARD] Nome do portador do segundo cartão é obrigatório');
+                                this.showSecondCardError(true);
+                                this.secondCardErrorMessage($t('Nome do portador do segundo cartão é obrigatório.'));
+                                return false;
+                            }
+                            
+                            if (!this.secondCreditCardExpDate() || this.secondCreditCardExpDate().length < 5) {
+                                console.error('[CARDCARD] Data de vencimento do segundo cartão é obrigatória');
+                                this.showSecondCardError(true);
+                                this.secondCardErrorMessage($t('Data de vencimento do segundo cartão é obrigatória.'));
+                                return false;
+                            }
+                            
+                            if (!this.secondCreditCardVerificationNumber() || this.secondCreditCardVerificationNumber().length < 3) {
+                                console.error('[CARDCARD] CVV do segundo cartão é obrigatório');
+                                this.showSecondCardError(true);
+                                this.secondCardErrorMessage($t('CVV do segundo cartão é obrigatório.'));
+                                return false;
+                            }
+                        }
+                    }
+
+                    // Validação manual do CPF/CNPJ usando método local
+                    if (!this.validateTaxvat()) {
+                        console.error('[CARDCARD] Validação de CPF/CNPJ falhou');
+                        return false;
+                    }
+
+                    console.log('[CARDCARD] Validação concluída com sucesso');
                     return true;
+                    
                 } catch (e) {
-                    console.error('Erro durante validação:', e);
-                    return true; // Em caso de erro na validação, permite continuar
+                    console.error('[CARDCARD] Erro durante validação:', e);
+                    return false; // Em caso de erro na validação, não permite continuar
                 }
             },
 
@@ -710,6 +1042,25 @@ define(
                 } catch (e) {
                     // eslint-disable-next-line no-console
                     console.log('Installments URL not defined');
+                    return "";
+                }
+            },
+
+            /**
+             * Retrieve dual card installments URL
+             * @returns {string}
+             */
+            retrieveDualCardInstallmentsUrl: function () {
+                try {
+                    return window.checkoutConfig.payment &&
+                    window.checkoutConfig.payment.ccform &&
+                    window.checkoutConfig.payment.ccform.urls &&
+                    window.checkoutConfig.payment.ccform.urls[this.getCode()] &&
+                    window.checkoutConfig.payment.ccform.urls[this.getCode()].retrieve_dual_card_installments
+                        ? window.checkoutConfig.payment.ccform.urls[this.getCode()].retrieve_dual_card_installments
+                        : "";
+                } catch (e) {
+                    console.log('Dual Card Installments URL not defined');
                     return "";
                 }
             },
@@ -954,7 +1305,7 @@ define(
                 // Cancel previous request if exists
                 if (self.secondDebounceTimer !== null) {
                     clearTimeout(self.secondDebounceTimer);
-                    console.log('[CARDCARD] Cancelando timer anterior do segundo cartão');
+                    console.log('[CARDCARD] Cancelando timer anterior do segundo cart��o');
                 }
 
                 self.secondInstallmentsDisabled(true);
@@ -1069,6 +1420,47 @@ define(
             },
 
             /**
+             * Trigger unified installment update - método principal para disparar o gerenciador
+             */
+            triggerUnifiedInstallmentUpdate: function() {
+                console.log('[CARDCARD] triggerUnifiedInstallmentUpdate chamado');
+
+                var firstCardAmount = parseFloat($('#first_card_amount').val() || 0);
+                var secondCardAmount = parseFloat($('#second_card_amount').val() || 0);
+
+                console.log('[CARDCARD] Valores - Cartão 1:', firstCardAmount, 'Cartão 2:', secondCardAmount);
+
+                // Debug: verificar se o DualCardInstallmentManager está disponível
+                if (!this.DualCardInstallmentManager) {
+                    console.error('[CARDCARD] DualCardInstallmentManager não está disponível!');
+                    return;
+                }
+
+                // Atualizar o gerenciador apenas com os valores (sem tipos)
+                if (firstCardAmount > 0) {
+                    console.log('[CARDCARD] Atualizando cartão 1 com valor:', firstCardAmount);
+                    this.DualCardInstallmentManager.updateCard(1, {
+                        type: 'VI', // Tipo padrão, não é relevante para parcelas
+                        amount: firstCardAmount
+                    });
+                }
+
+                if (secondCardAmount > 0) {
+                    console.log('[CARDCARD] Atualizando cartão 2 com valor:', secondCardAmount);
+                    this.DualCardInstallmentManager.updateCard(2, {
+                        type: 'VI', // Tipo padrão, não é relevante para parcelas
+                        amount: secondCardAmount
+                    });
+                }
+
+                // Se nenhum cartão tem valores válidos, limpar tudo
+                if (firstCardAmount === 0 && secondCardAmount === 0) {
+                    console.log('[CARDCARD] Nenhum valor válido, limpando parcelas');
+                    this.clearAllInstallments();
+                }
+            },
+
+            /**
              * Get payment profiles
              * @returns {Array}
              */
@@ -1100,131 +1492,188 @@ define(
             },
 
             /**
-             * Validate form
-             * @returns {boolean}
+             * Obter tipo do cartão (com fallbacks)
              */
-            validate: function () {
-                var self = this;
+            getCardType: function(cardIndex) {
+                if (cardIndex === 1) {
+                    // Primeiro cartão
+                    var cardType = this.selectedCardType() || this.creditCardType();
 
-                try {
-                    var $form = $('#' + 'form_' + this.getCode());
-
-                    // Validate first and second card amounts
-                    var firstCardAmount = parseFloat($('#first_card_amount').val() || 0);
-                    var secondCardAmount = parseFloat($('#second_card_amount').val() || 0);
-                    var grandTotal = this.getGrandTotal();
-
-                    // Reset error states
-                    this.showFirstCardError(false);
-                    this.showSecondCardError(false);
-                    $('#first_card_amount').removeClass('error');
-                    $('#second_card_amount').removeClass('error');
-                    this.isFormValid(true);
-
-                    // Validate first card amount
-                    if (firstCardAmount > grandTotal) {
-                        this.showFirstCardError(true);
-                        this.firstCardErrorMessage($t('O valor não pode ser maior que o total do pedido.'));
-                        $('#first_card_amount').addClass('error');
-                        this.isFormValid(false);
-                        return false;
-                    }
-
-                    // Validate second card amount
-                    if (secondCardAmount > grandTotal) {
-                        this.showSecondCardError(true);
-                        this.secondCardErrorMessage($t('O valor não pode ser maior que o total do pedido.'));
-                        $('#second_card_amount').addClass('error');
-                        this.isFormValid(false);
-                        return false;
-                    }
-
-                    // Validate total of both payment methods with tolerance for floating point errors
-                    var totalAmount = Math.round((firstCardAmount + secondCardAmount) * 100) / 100;
-                    var roundedGrandTotal = Math.round(grandTotal * 100) / 100;
-
-                    if (totalAmount > roundedGrandTotal + 0.01) { // Adding small tolerance (0.01)
-                        this.showFirstCardError(true);
-                        this.firstCardErrorMessage($t('A soma dos valores dos cartões não pode exceder o total do pedido.'));
-                        $('#first_card_amount').addClass('error');
-                        this.isFormValid(false);
-                        return false;
-                    }
-
-                    // Validate if at least one payment method is selected
-                    if (totalAmount === 0 || isNaN(totalAmount)) {
-                        this.showFirstCardError(true);
-                        this.firstCardErrorMessage($t('Pelo menos um método de pagamento deve ser selecionado.'));
-                        $('#first_card_amount').addClass('error');
-                        this.isFormValid(false);
-                        return false;
-                    }
-
-                    // Handle manual form validation instead of using jQuery validation plugin
-                    if ($form && $form.length) {
-                        var isValid = true;
-
-                        // Validate required fields
-                        $form.find('input[data-validate], select[data-validate]').each(function() {
-                            var $field = $(this);
-
-                            // Skip validation for fields in hidden sections
-                            if ($field.is(':hidden') || $field.closest('.field').is(':hidden')) {
-                                return;
-                            }
-
-                            // CVV validation is always required for both new and saved cards
-                            // Skip validation for payment profile when selected
-                            if (self.selectedPaymentProfile() && ($field.attr('id') === (self.getCode() + '_cc_number') ||
-                                $field.attr('id') === (self.getCode() + '_cc_owner') ||
-                                $field.attr('id') === (self.getCode() + '_cc_exp_date'))) {
-                                return;
-                            }
-
-                            // Skip validation for second payment profile when selected
-                            if (self.secondSelectedPaymentProfile() && ($field.attr('id') === (self.getCode() + '_second_cc_number') ||
-                                $field.attr('id') === (self.getCode() + '_second_cc_owner') ||
-                                $field.attr('id') === (self.getCode() + '_second_cc_exp_date'))) {
-                                return;
-                            }
-
-                            // Skip validation for first card fields when first card amount is 0
-                            if (firstCardAmount === 0 && ($field.attr('id') === (self.getCode() + '_cc_first_installments') ||
-                                $field.attr('id') === (self.getCode() + '_cc_number') ||
-                                $field.attr('id') === (self.getCode() + '_cc_owner') ||
-                                $field.attr('id') === (self.getCode() + '_cc_exp_date') ||
-                                $field.attr('id') === (self.getCode() + '_first_cc_cid'))) {
-                                return;
-                            }
-
-                            // Skip validation for second card fields when second card amount is 0
-                            if (secondCardAmount === 0 && ($field.attr('id') === (self.getCode() + '_cc_second_installments') ||
-                                $field.attr('id') === (self.getCode() + '_second_cc_number') ||
-                                $field.attr('id') === (self.getCode() + '_second_cc_owner') ||
-                                $field.attr('id') === (self.getCode() + '_second_cc_exp_date') ||
-                                $field.attr('id') === (self.getCode() + '_second_cc_cid'))) {
-                                return;
-                            }
-
-                            if ($field.val() === '') {
-                                isValid = false;
-                                $field.addClass('mage-error');
-                            } else {
-                                $field.removeClass('mage-error');
-                            }
-                        });
-
-                        if (!isValid) {
-                            return false;
+                    // Se usando cartão salvo
+                    if (this.selectedPaymentProfile() && !cardType) {
+                        var profiles = this.getPaymentProfiles();
+                        var selectedProfile = profiles.find(function(profile) {
+                            return profile.value == this.selectedPaymentProfile();
+                        }.bind(this));
+                        if (selectedProfile) {
+                            cardType = selectedProfile.card_type;
                         }
                     }
 
-                    return true;
-                } catch (e) {
-                    console.error('Validation error:', e);
+                    return cardType;
+                } else if (cardIndex === 2) {
+                    // Segundo cartão
+                    var cardType = this.secondSelectedCardType() || this.secondCreditCardType();
+
+                    // Se usando cartão salvo
+                    if (this.secondSelectedPaymentProfile() && !cardType) {
+                        var profiles = this.getPaymentProfiles();
+                        var selectedProfile = profiles.find(function(profile) {
+                            return profile.value == this.secondSelectedPaymentProfile();
+                        }.bind(this));
+                        if (selectedProfile) {
+                            cardType = selectedProfile.card_type;
+                        }
+                    }
+
+                    return cardType;
+                }
+
+                return null;
+            },
+
+            /**
+             * Limpar todas as parcelas
+             */
+            clearAllInstallments: function() {
+                console.log('[CARDCARD] Limpando todas as parcelas');
+
+                this.installments([]);
+                this.hasInstallments(false);
+                this.installmentsDisabled(true);
+                this.creditCardInstallments('');
+
+                this.secondInstallments([]);
+                this.hasSecondInstallments(false);
+                this.secondInstallmentsDisabled(true);
+                this.secondCreditCardInstallments('');
+            },
+
+            /**
+             * Validar CPF/CNPJ manualmente
+             * @returns {boolean}
+             */
+            validateTaxvat: function() {
+                var taxvatField = $('#' + this.getCode() + '_taxvat');
+                if (taxvatField.length === 0) {
+                    return true; // Se não existe o campo, considera válido
+                }
+
+                var taxvatValue = taxvatField.val();
+                if (!taxvatValue || taxvatValue.trim() === '') {
+                    console.error('CPF/CNPJ é obrigatório');
                     return false;
                 }
+
+                // Remove formatação
+                var cleanTaxvat = taxvatValue.replace(/[^\d]/g, '');
+                
+                // Validação básica de comprimento
+                if (cleanTaxvat.length !== 11 && cleanTaxvat.length !== 14) {
+                    console.error('CPF/CNPJ deve ter 11 ou 14 dígitos');
+                    return false;
+                }
+
+                // Validação de CPF (11 dígitos)
+                if (cleanTaxvat.length === 11) {
+                    return this.validateCpfLocal(cleanTaxvat);
+                }
+
+                // Validação de CNPJ (14 dígitos)
+                if (cleanTaxvat.length === 14) {
+                    return this.validateCnpjLocal(cleanTaxvat);
+                }
+
+                return false;
+            },
+
+            /**
+             * Validar CPF localmente
+             * @param {string} cpf
+             * @returns {boolean}
+             */
+            validateCpfLocal: function(cpf) {
+                // CPFs inválidos conhecidos
+                var invalidCpfs = [
+                    "00000000000", "11111111111", "22222222222", "33333333333",
+                    "44444444444", "55555555555", "66666666666", "77777777777",
+                    "88888888888", "99999999999"
+                ];
+
+                if (invalidCpfs.indexOf(cpf) !== -1) {
+                    return false;
+                }
+
+                var sum = 0;
+                var remainder;
+
+                // Validação do primeiro dígito
+                for (var i = 1; i <= 9; i++) {
+                    sum += parseInt(cpf[i - 1]) * (11 - i);
+                }
+                remainder = (sum * 10) % 11;
+                if (remainder === 10 || remainder === 11) remainder = 0;
+                if (remainder !== parseInt(cpf[9])) return false;
+
+                // Validação do segundo dígito
+                sum = 0;
+                for (i = 1; i <= 10; i++) {
+                    sum += parseInt(cpf[i - 1]) * (12 - i);
+                }
+                remainder = (sum * 10) % 11;
+                if (remainder === 10 || remainder === 11) remainder = 0;
+                if (remainder !== parseInt(cpf[10])) return false;
+
+                return true;
+            },
+
+            /**
+             * Validar CNPJ localmente
+             * @param {string} cnpj
+             * @returns {boolean}
+             */
+            validateCnpjLocal: function(cnpj) {
+                // CNPJs inválidos conhecidos
+                var invalidCnpjs = [
+                    "00000000000000", "11111111111111", "22222222222222", "33333333333333",
+                    "44444444444444", "55555555555555", "66666666666666", "77777777777777",
+                    "88888888888888", "99999999999999"
+                ];
+
+                if (invalidCnpjs.indexOf(cnpj) !== -1) {
+                    return false;
+                }
+
+                var length = cnpj.length - 2;
+                var numbers = cnpj.substring(0, length);
+                var digits = cnpj.substring(length);
+                var sum = 0;
+                var pos = length - 7;
+
+                for (var i = length; i >= 1; i--) {
+                    sum += numbers.charAt(length - i) * pos--;
+                    if (pos < 2) pos = 9;
+                }
+
+                var result = sum % 11 < 2 ? 0 : 11 - sum % 11;
+                if (result != digits.charAt(0)) return false;
+
+                length = length + 1;
+                numbers = cnpj.substring(0, length);
+                sum = 0;
+                pos = length - 7;
+                for (i = length; i >= 1; i--) {
+                    sum += numbers.charAt(length - i) * pos--;
+                    if (pos < 2) pos = 9;
+                }
+                result = sum % 11 < 2 ? 0 : 11 - sum % 11;
+                if (result != digits.charAt(1)) return false;
+
+                return true;
             }
+
+            // ...existing code...
         });
     }
 );
+

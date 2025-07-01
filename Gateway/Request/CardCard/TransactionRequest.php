@@ -135,49 +135,84 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
      */
     public function build(array $buildSubject): array
     {
-        if (!isset($buildSubject['payment'])
-            || !$buildSubject['payment'] instanceof PaymentDataObjectInterface
-        ) {
-            throw new \InvalidArgumentException('Payment data object should be provided');
+        try {
+            $this->logger->info('[CardCard TransactionRequest] Iniciando build');
+            
+            if (!isset($buildSubject['payment'])
+                || !$buildSubject['payment'] instanceof PaymentDataObjectInterface
+            ) {
+                throw new \InvalidArgumentException('Payment data object should be provided');
+            }
+
+            $payment = $buildSubject['payment']->getPayment();
+            $order = $payment->getOrder();
+
+            $this->logger->info('[CardCard TransactionRequest] Order ID: ' . $order->getIncrementId());
+            
+            // Log todas as informações adicionais do pagamento
+            $additionalInfo = $payment->getAdditionalInformation();
+            $this->logger->info('[CardCard TransactionRequest] Additional Information: ' . json_encode($additionalInfo));
+
+            // Valores de split vindos do frontend
+            $amountCard1 = (float)($payment->getAdditionalInformation('amount_card1') ?? 0);
+            $amountCard2 = (float)($payment->getAdditionalInformation('amount_card2') ?? 0);
+
+            $this->logger->info('[CardCard TransactionRequest] Valores do frontend - Card1: ' . $amountCard1 . ', Card2: ' . $amountCard2);
+
+            // Se não vierem valores, dividir meio a meio como fallback
+            if ($amountCard1 <= 0 && $amountCard2 <= 0) {
+                $grandTotal = (float)$order->getGrandTotal();
+                $amountCard1 = round($grandTotal / 2, 2);
+                $amountCard2 = $grandTotal - $amountCard1;
+                
+                $this->logger->info('[CardCard TransactionRequest] Usando fallback - Card1: ' . $amountCard1 . ', Card2: ' . $amountCard2);
+            }
+
+            // Log para debug dos valores
+            $this->logger->info('CardCard Transaction Build - Order: ' . $order->getIncrementId() .
+                         ', Total: ' . $order->getGrandTotal() .
+                         ', Subtotal: ' . $order->getBaseSubtotal() .
+                         ', Shipping: ' . $order->getShippingAmount() .
+                         ', Discount: ' . $order->getDiscountAmount() .
+                         ', Card1: ' . $amountCard1 .
+                         ', Card2: ' . $amountCard2);
+
+            // Construir apenas a requisição do primeiro cartão (primeira transação)
+            $this->logger->info('[CardCard TransactionRequest] Construindo requisição do primeiro cartão');
+            $card1Request = $this->buildPrimaryCard1Request($order, $payment, $amountCard1);
+
+            // Log the card1Request to verify it's not empty
+            $this->logger->info('[CardCard TransactionRequest] Card1 Request Data: ' . json_encode($card1Request));
+
+            // Salvar o registro do segundo cartão na queue logo após criar a requisição do primeiro cartão
+            $this->logger->info('[CardCard TransactionRequest] Adicionando segundo cartão à fila');
+            $this->queueCard2Payment($order, $payment, $amountCard2);
+
+            $result = [
+                'request' => $card1Request,
+                'client_config' => [
+                    'store_id' => (int)$order->getStoreId(),
+                    'amount_card2' => $amountCard2, // Para ser usado no response handler
+                    'increment_id' => $order->getIncrementId()
+                ]
+            ];
+
+            // Log the final result to verify structure
+            $this->logger->info('[CardCard TransactionRequest] Final Result Structure: ' . json_encode([
+                'has_request_key' => isset($result['request']),
+                'has_client_config_key' => isset($result['client_config']),
+                'request_empty' => empty($result['request'])
+            ]));
+            
+            $this->logger->info('[CardCard TransactionRequest] Build finalizado com sucesso');
+            
+            return $result;
+            
+        } catch (\Exception $e) {
+            $this->logger->error('[CardCard TransactionRequest] Erro no build: ' . $e->getMessage());
+            $this->logger->error('[CardCard TransactionRequest] Stack trace: ' . $e->getTraceAsString());
+            throw $e;
         }
-
-        $payment = $buildSubject['payment']->getPayment();
-        $order = $payment->getOrder();
-
-        // Valores de split vindos do frontend
-        $amountCard1 = (float)($payment->getAdditionalInformation('amount_card1') ?? 0);
-        $amountCard2 = (float)($payment->getAdditionalInformation('amount_card2') ?? 0);
-
-        // Se não vierem valores, dividir meio a meio como fallback
-        if ($amountCard1 <= 0 && $amountCard2 <= 0) {
-            $grandTotal = (float)$order->getGrandTotal();
-            $amountCard1 = round($grandTotal / 2, 2);
-            $amountCard2 = $grandTotal - $amountCard1;
-        }
-
-        // Log para debug dos valores
-        $this->logger->info('CardCard Transaction Build - Order: ' . $order->getIncrementId() .
-                     ', Total: ' . $order->getGrandTotal() .
-                     ', Subtotal: ' . $order->getBaseSubtotal() .
-                     ', Shipping: ' . $order->getShippingAmount() .
-                     ', Discount: ' . $order->getDiscountAmount() .
-                     ', Card1: ' . $amountCard1 .
-                     ', Card2: ' . $amountCard2);
-
-        // Construir apenas a requisição do primeiro cartão (primeira transação)
-        $card1Request = $this->buildPrimaryCard1Request($order, $payment, $amountCard1);
-
-        // Salvar o registro do segundo cartão na queue logo após criar a requisição do primeiro cartão
-        $this->queueCard2Payment($order, $payment, $amountCard2);
-
-        return [
-            'request' => $card1Request,
-            'client_config' => [
-                'store_id' => (int)$order->getStoreId(),
-                'amount_card2' => $amountCard2, // Para ser usado no response handler
-                'increment_id' => $order->getIncrementId()
-            ]
-        ];
     }
 
     /**
@@ -440,8 +475,12 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
      */
     private function buildPrimaryCard1Request($order, $payment, float $amountCard1): array
     {
+        $this->logger->info('[CardCard] Iniciando buildPrimaryCard1Request com amount: ' . $amountCard1);
+        
         // Get the base transaction request for the card1 amount only
         $transaction = $this->getTransaction($order, $amountCard1);
+        
+        $this->logger->info('[CardCard] Transaction base criada: ' . json_encode(array_keys($transaction)));
 
         // Override order_number with increment_id-01 format for card1 payment
         $orderNumber = $order->getIncrementId() . '-01';
@@ -453,10 +492,23 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         // Add credit card payment data
         $paymentProfileId = $payment->getAdditionalInformation('payment_profile');
         if ($paymentProfileId) {
+            $this->logger->info('[CardCard] Usando cartão salvo: ' . $paymentProfileId);
             $transaction['payment'] = $this->getSavedCardData((string)$paymentProfileId, $payment);
         } else {
+            $this->logger->info('[CardCard] Usando cartão novo');
             $transaction['payment'] = $this->getNewCardData($payment);
         }
+        
+        // Log final structure without sensitive data
+        $logTransaction = $transaction;
+        if (isset($logTransaction['payment']['card_number'])) {
+            $logTransaction['payment']['card_number'] = '****';
+        }
+        if (isset($logTransaction['payment']['card_cvv'])) {
+            $logTransaction['payment']['card_cvv'] = '***';
+        }
+        
+        $this->logger->info('[CardCard] Transaction final structure: ' . json_encode($logTransaction));
 
         return $transaction;
     }
@@ -490,11 +542,25 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         ];
 
         $payment->setAdditionalInformation('card2_queue_data', $card2QueueData);
+        
+        // Force save the payment to ensure data is persisted
+        try {
+            $payment->save();
+            $this->logger->info("CardCard - Payment saved successfully after setting card2_queue_data for order {$order->getIncrementId()}");
+        } catch (\Exception $e) {
+            $this->logger->error("CardCard - Failed to save payment after setting card2_queue_data for order {$order->getIncrementId()}: " . $e->getMessage());
+        }
 
-        // Log the queue operation
+        // Log the data being set and verify it was set correctly
         $this->logger->info(
             "CardCard - Card2 payment data prepared for queue for order {$order->getIncrementId()} with amount: {$amountCard2}",
             ['increment_id' => $order->getIncrementId(), 'amount_card2' => $amountCard2]
+        );
+        
+        // Verify the data was set correctly
+        $retrievedData = $payment->getAdditionalInformation('card2_queue_data');
+        $this->logger->info(
+            "CardCard - Verification: Card2 queue data was set in payment additional info for order {$order->getIncrementId()}: " . json_encode($retrievedData)
         );
     }
 

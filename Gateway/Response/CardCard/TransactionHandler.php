@@ -86,10 +86,41 @@ class TransactionHandler implements HandlerInterface
             "CardCard TransactionHandler - Processing order {$order->getIncrementId()}",
             'cardcard_handler'
         );
+        
+        // Debug: log the response structure
+        $this->helper->log(
+            "CardCard TransactionHandler - Response structure: " . json_encode(array_keys($response)),
+            'cardcard_debug'
+        );
+        if (isset($response['transaction'])) {
+            $this->helper->log(
+                "CardCard TransactionHandler - Transaction keys: " . json_encode(array_keys($response['transaction'])),
+                'cardcard_debug'
+            );
+        }
 
         // Process Card1 response (primary transaction)
-        if (isset($response['transaction'])) {
-            $card1Transaction = $response['transaction'];
+        $card1Transaction = null;
+        
+        // Check different response structures
+        if (isset($response['transaction']['data_response']['transaction'])) {
+            // Structure: response[transaction][data_response][transaction]
+            $card1Transaction = $response['transaction']['data_response']['transaction'];
+        } elseif (isset($response['transaction']['transaction'])) {
+            // Structure: response[transaction][transaction] 
+            $card1Transaction = $response['transaction']['transaction'];
+        } elseif (isset($response['transaction'])) {
+            // Structure: response[transaction] - check if this IS the transaction data
+            $potentialTransaction = $response['transaction'];
+            if (isset($potentialTransaction['status_id'])) {
+                $card1Transaction = $potentialTransaction;
+            }
+        } elseif (isset($response['data_response']['transaction'])) {
+            // Structure: response[data_response][transaction]
+            $card1Transaction = $response['data_response']['transaction'];
+        }
+        
+        if ($card1Transaction) {
             $card1Tid = $card1Transaction['payment']['tid'] ?? '';
             $card1Status = $card1Transaction['status_id'] ?? '';
 
@@ -116,6 +147,10 @@ class TransactionHandler implements HandlerInterface
                     "CardCard - Card1 payment successful for order {$order->getIncrementId()}, TID: {$card1Tid}. Card2 remains pending for processing.",
                     'cardcard_handler'
                 );
+                
+                // Mark payment as pending (not closed) to allow order to continue processing
+                $payment->setIsTransactionPending(true);
+                $payment->setIsTransactionClosed(false);
             } else {
                 // Card1 payment failed - update existing card2 queue record to failed status (cancelled due to card1 failure)
                 $this->updateCard2QueueRecord($order, $card1Tid, MultiPaymentQueue::STATUS_FAILED);
@@ -132,6 +167,12 @@ class TransactionHandler implements HandlerInterface
                 $payment->setIsTransactionPending(false);
                 $payment->setIsTransactionClosed(true);
             }
+        } else {
+            // Log if we couldn't find transaction data
+            $this->helper->log(
+                "CardCard - No transaction data found in response for order {$order->getIncrementId()}",
+                'cardcard_error'
+            );
         }
 
         // Store the complete response data as additional information
@@ -204,8 +245,25 @@ class TransactionHandler implements HandlerInterface
         $statusId = $response['status_id'] ?? null;
         $tid = $response['payment']['tid'] ?? null;
 
+        // Debug log
+        $this->helper->log(
+            "CardCard isSuccessfulResponse - StatusId: {$statusId}, TID: {$tid}",
+            'cardcard_debug'
+        );
+
         // Status 3 = Authorized, Status 4 = Captured - both are successful for cards
-        return !empty($tid) && in_array($statusId, ['3', '4']);
+        // For status 4 (waiting payment), tid might be empty, which is still considered successful
+        if ($statusId == '4' || $statusId == 4) {
+            $this->helper->log("CardCard isSuccessfulResponse - Status 4 SUCCESS", 'cardcard_debug');
+            return true; // Status 4 is always successful for the initial transaction
+        } elseif ($statusId == '3' || $statusId == 3) {
+            $success = !empty($tid);
+            $this->helper->log("CardCard isSuccessfulResponse - Status 3, Success: " . ($success ? 'true' : 'false'), 'cardcard_debug');
+            return $success; // Status 3 requires tid to be present and not empty
+        }
+        
+        $this->helper->log("CardCard isSuccessfulResponse - FAILURE - Invalid status", 'cardcard_debug');
+        return false;
     }
 
     /**

@@ -37,34 +37,25 @@ class CardCardValidator extends AbstractValidator
 
         $response = $validationSubject['response'];
 
+        // Check for general error
         if (isset($response['error']) && $response['error'] === true) {
-            $card1ErrorMessage = $response['card1_response']['message'] ?? 'Unknown error in first card payment';
-            $card2ErrorMessage = $response['card2_response']['message'] ?? '';
+            $errorMessage = $response['message'] ?? 'Unknown error in CardCard payment';
+            return $this->createResult(false, [$errorMessage]);
+        }
 
-            $errorMessages = [$card1ErrorMessage];
-            if (!empty($card2ErrorMessage)) {
-                $errorMessages[] = $card2ErrorMessage;
+        // For CardCard, we only validate the first card response initially
+        // The second card will be processed asynchronously via queue
+        if (isset($response['transaction'])) {
+            // Validate the first card response
+            $card1Valid = $this->validateCardResponse($response['transaction'], 'first');
+            if (!$card1Valid['isValid']) {
+                return $this->createResult(
+                    false,
+                    [__('First card payment validation error: %1', implode(', ', $card1Valid['failsDescription']))]
+                );
             }
-
-            return $this->createResult(false, $errorMessages);
-        }
-
-        // Validate the first card response
-        $card1Valid = $this->validateCardResponse($response['card1_response'] ?? [], 'first');
-        if (!$card1Valid['isValid']) {
-            return $this->createResult(
-                false,
-                [__('First card payment validation error: %1', implode(', ', $card1Valid['failsDescription']))]
-            );
-        }
-
-        // Validate the second card response
-        $card2Valid = $this->validateCardResponse($response['card2_response'] ?? [], 'second');
-        if (!$card2Valid['isValid']) {
-            return $this->createResult(
-                false,
-                [__('Second card payment validation error: %1', implode(', ', $card2Valid['failsDescription']))]
-            );
+        } else {
+            return $this->createResult(false, [__('No transaction data found in response')]);
         }
 
         return $this->createResult(true);

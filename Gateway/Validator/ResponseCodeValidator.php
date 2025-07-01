@@ -52,10 +52,17 @@ class ResponseCodeValidator extends AbstractValidator
      */
     private function isSuccessfulTransaction($response)
     {
-        return (
-            isset($response['status_code'])
-            && $response['status_code'] >= 200
-            && $response['status_code'] < 300
-        );
+        // Check for HTTP status code (used by Transaction.php)
+        if (isset($response['status_code'])) {
+            return $response['status_code'] >= 200 && $response['status_code'] < 300;
+        }
+        
+        // Check for HTTP status (used by Transaction.php)
+        if (isset($response['status'])) {
+            return $response['status'] >= 200 && $response['status'] < 300;
+        }
+        
+        // Fallback: if no status indicators found, return false
+        return false;
     }
 }

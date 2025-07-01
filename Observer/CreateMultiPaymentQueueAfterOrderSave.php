@@ -143,14 +143,21 @@ class CreateMultiPaymentQueueAfterOrderSave implements ObserverInterface
     private function processCardCard($order, $payment): void
     {
         $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - Processing CardCard payment for order: " . $order->getIncrementId());
+        
+        // Log all additional information to debug
+        $allAdditionalInfo = $payment->getAdditionalInformation();
+        $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - All payment additional info for order " . $order->getIncrementId() . ": " . json_encode($allAdditionalInfo));
 
         // Process Card2 queue data if present
         $card2QueueData = $payment->getAdditionalInformation('card2_queue_data');
+        $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - Card2 queue data for order " . $order->getIncrementId() . ": " . json_encode($card2QueueData));
+        
         if ($card2QueueData && is_array($card2QueueData)) {
             $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - Found Card2 queue data for order: " . $order->getIncrementId());
             $this->processQueueData($order, $payment, $card2QueueData, 'Card2', 'card2_queue_data');
         } else {
             $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - No Card2 queue data found for order: " . $order->getIncrementId());
+            $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - Card2QueueData type: " . gettype($card2QueueData) . ", is_array: " . (is_array($card2QueueData) ? 'true' : 'false'));
         }
     }
 

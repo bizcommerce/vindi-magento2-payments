@@ -42,6 +42,7 @@ use Vindi\VP\Model\Customer\Company;
 use Magento\Framework\Module\Manager as ModuleManager;
 use Vindi\VP\Logger\Logger;
 use Magento\Framework\Exception\LocalizedException;
+use Laminas\Http\Client as HttpClient;
 
 /**
  * Class Data
@@ -683,6 +684,171 @@ class Data extends \Magento\Payment\Helper\Data
             } else {
                 $this->logger->info($message, is_array($data) ? $data : ['data' => $data]);
             }
+        }
+    }
+
+    /**
+     * Mask sensitive data in arrays/objects for logging purposes
+     *
+     * @param mixed $data
+     * @return mixed
+     */
+    public function maskSensitiveData($data)
+    {
+        if (is_array($data)) {
+            $maskedData = [];
+            foreach ($data as $key => $value) {
+                $maskedData[$key] = $this->maskSensitiveValue($key, $value);
+            }
+            return $maskedData;
+        }
+
+        if (is_object($data)) {
+            $dataArray = json_decode(json_encode($data), true);
+            return $this->maskSensitiveData($dataArray);
+        }
+
+        return $data;
+    }
+
+    /**
+     * Mask sensitive value based on key name
+     *
+     * @param string $key
+     * @param mixed $value
+     * @return mixed
+     */
+    private function maskSensitiveValue(string $key, $value)
+    {
+        // Sensitive field patterns
+        $sensitiveFields = [
+            'card_number',
+            'card_cvv',
+            'cc_number',
+            'cc_cid',
+            'cc_cvv',
+            'cvv',
+            'password',
+            'token',
+            'key',
+            'secret'
+        ];
+
+        // Check if key contains sensitive information
+        $keyLower = strtolower($key);
+        foreach ($sensitiveFields as $sensitiveField) {
+            if (strpos($keyLower, $sensitiveField) !== false) {
+                if (is_string($value) && !empty($value)) {
+                    if ($sensitiveField === 'card_number' || $sensitiveField === 'cc_number') {
+                        // For card numbers, show only first 4 and last 4 digits
+                        if (strlen($value) >= 8) {
+                            return substr($value, 0, 4) . '****' . substr($value, -4);
+                        }
+                    } else {
+                        // For other sensitive fields, mask completely
+                        return str_repeat('*', min(strlen($value), 8));
+                    }
+                }
+                return $value;
+            }
+        }
+
+        // Recursively process arrays and objects
+        if (is_array($value)) {
+            return $this->maskSensitiveData($value);
+        }
+
+        if (is_object($value)) {
+            return $this->maskSensitiveData($value);
+        }
+
+        return $value;
+    }
+
+    /**
+     * Get API URL for a specific endpoint
+     *
+     * @param string $endpoint
+     * @param int|null $storeId
+     * @return string
+     */
+    public function getApiUrl(string $endpoint, ?int $storeId = null): string
+    {
+        $type = 'payments';
+        $uri = $this->helperConfig->getEndpointConfig($type . '_uri', $storeId);
+
+        if ($this->helperConfig->getGeneralConfig('use_sandbox', $storeId)) {
+            $uri = $this->helperConfig->getEndpointConfig($type . '_uri_sandbox', $storeId);
+        }
+
+        // Remove trailing slash from URI if present
+        $uri = rtrim($uri, '/');
+        
+        // Add leading slash to endpoint if not present
+        if (!str_starts_with($endpoint, '/')) {
+            $endpoint = '/' . $endpoint;
+        }
+
+        return $uri . $endpoint;
+    }
+
+    /**
+     * Get public key for API authentication
+     *
+     * @param int|null $storeId
+     * @return string
+     */
+    public function getPublicKey(?int $storeId = null): string
+    {
+        // Based on the implementation pattern, the public key is likely the consumer key
+        // or access token used for API authentication
+        return $this->getConsumerKey($storeId);
+    }
+
+    /**
+     * Make HTTP request using Laminas HttpClient
+     *
+     * @param string $endpoint
+     * @param array $data
+     * @param string $method
+     * @param int|null $storeId
+     * @return array
+     */
+    public function makeHttpRequest(string $endpoint, array $data = [], string $method = 'POST', ?int $storeId = null): array
+    {
+        try {
+            $url = $this->getApiUrl($endpoint, $storeId);
+            
+            $client = new HttpClient($url, [
+                'timeout' => 45,
+                'maxredirects' => 0
+            ]);
+
+            $client->setHeaders([
+                'Content-Type' => 'application/json',
+                'key' => $this->getPublicKey($storeId)
+            ]);
+
+            $client->setMethod($method);
+            
+            if (!empty($data) && in_array($method, ['POST', 'PUT', 'PATCH'])) {
+                $client->setRawBody($this->json->serialize($data));
+            }
+
+            $response = $client->send();
+            $responseBody = $response->getBody();
+            
+            if (empty($responseBody)) {
+                return ['success' => true, 'response' => []];
+            }
+            
+            return $this->json->unserialize($responseBody);
+            
+        } catch (\Exception $e) {
+            return [
+                'error' => true,
+                'message' => $e->getMessage()
+            ];
         }
     }
 }

@@ -132,7 +132,8 @@ class ConfigProvider extends CcGenericConfigProvider
                     'cvvImageUrl' => [$methodCode => $this->getCvvImageUrl()],
                     'urls' => [
                         $methodCode => [
-                            'retrieve_installments' => $this->urlBuilder->getUrl('vindi_vp/installments/retrieve')
+                            'retrieve_installments' => $this->urlBuilder->getUrl('vindi_vp/installments/retrieve'),
+                            'retrieve_dual_card_installments' => $this->urlBuilder->getUrl('vindi_vp/installments/retrieveDualCard')
                         ]
                     ]
                 ]

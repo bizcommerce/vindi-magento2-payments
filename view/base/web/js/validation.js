@@ -22,9 +22,10 @@
 define([
     'jquery',
     'Vindi_VP/js/model/credit-card-validation/credit-card-number-validator',
+    'Vindi_VP/js/model/validate',
     'mage/translate',
     'validation'
-], function ($, creditCardNumberValidator, $t) {
+], function ($, creditCardNumberValidator, taxvatValidator, $t) {
     'use strict';
 
     /**
@@ -133,4 +134,19 @@ define([
         },
         $t('Please enter a valid credit card type number.')
     );
+
+    $.validator.addMethod(
+        'validate-taxvat',
+        function (value, element) {
+            if (!value || value.trim() === '') {
+                return false;
+            }
+            // Remove formatação
+            var cleanValue = value.replace(/[^\d]/g, '');
+            return taxvatValidator.isValidTaxvat(cleanValue);
+        },
+        $t('Please enter a valid CPF or CNPJ.')
+    );
+
+    return true;
 });

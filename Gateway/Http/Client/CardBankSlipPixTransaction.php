@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace Vindi\VP\Gateway\Http\Client;
 
-use Magento\Framework\HTTP\ZendClientFactory;
+use Laminas\Http\Client as HttpClient;
 use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Payment\Gateway\Http\ClientInterface;
 use Magento\Payment\Gateway\Http\TransferInterface;
@@ -28,19 +28,14 @@ use Vindi\VP\Model\AccessToken;
 class CardBankSlipPixTransaction implements ClientInterface
 {
     /**
-     * @var ZendClientFactory
+     * @var Json
      */
-    private $clientFactory;
+    private $json;
 
     /**
      * @var Logger
      */
     private $logger;
-
-    /**
-     * @var Json
-     */
-    private $json;
 
     /**
      * @var Data
@@ -60,7 +55,6 @@ class CardBankSlipPixTransaction implements ClientInterface
     /**
      * CardBankSlipPixTransaction constructor.
      *
-     * @param ZendClientFactory $clientFactory
      * @param Logger $logger
      * @param Json $json
      * @param Data $helper
@@ -68,14 +62,12 @@ class CardBankSlipPixTransaction implements ClientInterface
      * @param string $methodCode
      */
     public function __construct(
-        ZendClientFactory $clientFactory,
         Logger $logger,
         Json $json,
         Data $helper,
         AccessToken $accessToken,
         $methodCode = 'vindi_vp_cardbankslippix'
     ) {
-        $this->clientFactory = $clientFactory;
         $this->logger = $logger;
         $this->json = $json;
         $this->helper = $helper;
