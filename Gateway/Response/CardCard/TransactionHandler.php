@@ -47,6 +47,11 @@ class TransactionHandler implements HandlerInterface
     protected $multiPaymentQueueService;
 
     /**
+     * @var EventManagerInterface
+     */
+    protected $eventManager;
+
+    /**
      * @param Json $serializer
      * @param Data $helper
      * @param PaymentLinkService $paymentLinkService

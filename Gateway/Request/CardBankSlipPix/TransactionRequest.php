@@ -329,9 +329,8 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         // Build Bolepix request data
         $bolepixRequestData = $this->buildBolepixRequestData($order, $payment, $amountBolepix);
 
-        // Store Bolepix queue data in payment additional information for later processing
-        // This will be processed after the order is saved via observer
-        $bolepixQueueData = [
+        // Prepare queue data for the event
+        $queueData = [
             'increment_id' => (string)$order->getIncrementId(),
             'payment_method' => 'vindi_vp_cardbankslippix',
             'secondary_method_type' => MultiPaymentQueue::SECONDARY_METHOD_BOLEPIX,
@@ -340,11 +339,14 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
             'status' => MultiPaymentQueue::STATUS_PENDING
         ];
 
-        $payment->setAdditionalInformation('bolepix_queue_data', $bolepixQueueData);
+        // Dispatch custom event to process multi-payment queue immediately
+        $this->eventManager->dispatch('vindi_vp_process_multi_payment_queue', [
+            'order' => $order,
+            'queue_data' => $queueData
+        ]);
 
-        // Log the queue operation
         $this->logger->info(
-            "CardBankSlipPix - Bolepix payment data prepared for queue for order {$order->getIncrementId()} with amount: {$amountBolepix}",
+            "CardBankSlipPix - Custom event 'vindi_vp_process_multi_payment_queue' dispatched for order {$order->getIncrementId()} with Bolepix amount: {$amountBolepix}",
             ['increment_id' => $order->getIncrementId(), 'amount_bolepix' => $amountBolepix]
         );
     }

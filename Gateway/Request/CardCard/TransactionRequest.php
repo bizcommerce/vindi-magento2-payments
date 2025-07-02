@@ -530,9 +530,8 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         // Build Card2 request data
         $card2RequestData = $this->buildCard2RequestData($order, $payment, $amountCard2);
 
-        // Store Card2 queue data in payment additional information for later processing
-        // This will be processed after the order is saved via observer
-        $card2QueueData = [
+        // Prepare queue data for the event
+        $queueData = [
             'increment_id' => (string)$order->getIncrementId(),
             'payment_method' => 'vindi_vp_cardcard',
             'secondary_method_type' => MultiPaymentQueue::SECONDARY_METHOD_CARD2,
@@ -541,26 +540,15 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
             'status' => MultiPaymentQueue::STATUS_PENDING
         ];
 
-        $payment->setAdditionalInformation('card2_queue_data', $card2QueueData);
-        
-        // Force save the payment to ensure data is persisted
-        try {
-            $payment->save();
-            $this->logger->info("CardCard - Payment saved successfully after setting card2_queue_data for order {$order->getIncrementId()}");
-        } catch (\Exception $e) {
-            $this->logger->error("CardCard - Failed to save payment after setting card2_queue_data for order {$order->getIncrementId()}: " . $e->getMessage());
-        }
+        // Dispatch custom event to process multi-payment queue immediately
+        $this->eventManager->dispatch('vindi_vp_process_multi_payment_queue', [
+            'order' => $order,
+            'queue_data' => $queueData
+        ]);
 
-        // Log the data being set and verify it was set correctly
         $this->logger->info(
-            "CardCard - Card2 payment data prepared for queue for order {$order->getIncrementId()} with amount: {$amountCard2}",
+            "CardCard - Custom event 'vindi_vp_process_multi_payment_queue' dispatched for order {$order->getIncrementId()} with Card2 amount: {$amountCard2}",
             ['increment_id' => $order->getIncrementId(), 'amount_card2' => $amountCard2]
-        );
-        
-        // Verify the data was set correctly
-        $retrievedData = $payment->getAdditionalInformation('card2_queue_data');
-        $this->logger->info(
-            "CardCard - Verification: Card2 queue data was set in payment additional info for order {$order->getIncrementId()}: " . json_encode($retrievedData)
         );
     }
 

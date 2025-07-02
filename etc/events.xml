@@ -44,16 +44,16 @@
 
     <event name="sales_model_service_quote_submit_success">
         <observer name="vindi_vp_sales_order_payment_place_end" instance="Vindi\VP\Observer\Sales\QuoteSubmitSuccess"/>
-        <observer name="vindi_vp_enqueue_pix_after_card_approved" instance="Vindi\VP\Observer\EnqueuePixAfterCardApprovedObserver"/>
+        <observer name="vindi_vp_update_multi_payment_queue_order_id" instance="Vindi\VP\Observer\UpdateMultiPaymentQueueOrderId"/>
     </event>
 
     <event name="sales_order_shipment_track_save_after">
         <observer name="vindi_vp_send_tracking" instance="Vindi\VP\Observer\Sales\SendTrackingData" />
     </event>
 
-    <event name="sales_order_save_after">
-        <observer name="vindi_vp_create_pix_queue_after_order_save" instance="Vindi\VP\Observer\CreatePixQueueAfterOrderSave" />
-        <observer name="vindi_vp_create_multi_payment_queue_after_order_save" instance="Vindi\VP\Observer\CreateMultiPaymentQueueAfterOrderSave" />
+    <!-- Custom event for multi-payment queue processing -->
+    <event name="vindi_vp_process_multi_payment_queue">
+        <observer name="vindi_vp_create_multi_payment_queue_observer" instance="Vindi\VP\Observer\CreateMultiPaymentQueueAfterOrderSave" />
     </event>
 
     <event name="payment_method_assign_data_vindi_vp_cardpix">

@@ -182,7 +182,7 @@
 
     <table name="vindi_vp_multi_payment_queue" resource="default" engine="innodb" comment="Vindi VP Multi Payment Queue">
         <column xsi:type="int" name="entity_id" unsigned="true" nullable="false" identity="true" comment="Entity ID"/>
-        <column xsi:type="int" name="order_id" unsigned="true" nullable="false" comment="Order ID"/>
+        <column xsi:type="int" name="order_id" nullable="true" comment="Order ID (Reference only, not FK)"/>
         <column xsi:type="varchar" name="increment_id" length="32" nullable="false" comment="Order Increment ID"/>
         <column xsi:type="varchar" name="payment_method" length="64" nullable="false" comment="Payment Method Code"/>
         <column xsi:type="varchar" name="primary_transaction_id" length="255" nullable="true" comment="Primary Transaction ID"/>
@@ -200,7 +200,6 @@
         <constraint xsi:type="primary" referenceId="PRIMARY">
             <column name="entity_id"/>
         </constraint>
-        <constraint xsi:type="foreign" referenceId="VINDI_VP_MULTI_PAYMENT_QUEUE_ORDER_ID_SALES_ORDER_ENTITY_ID" table="vindi_vp_multi_payment_queue" column="order_id" referenceTable="sales_order" referenceColumn="entity_id" onDelete="CASCADE"/>
         <index referenceId="VINDI_VP_MULTI_PAYMENT_QUEUE_ORDER_ID" indexType="btree">
             <column name="order_id"/>
         </index>

@@ -48,7 +48,7 @@ class CreateMultiPaymentQueueAfterOrderSave implements ObserverInterface
     }
 
     /**
-     * Create multi-payment queue records after order save for multi-payment methods
+     * Create multi-payment queue records with data provided by the event
      *
      * @param Observer $observer
      * @return void
@@ -57,134 +57,29 @@ class CreateMultiPaymentQueueAfterOrderSave implements ObserverInterface
     {
         /** @var \Magento\Sales\Model\Order $order */
         $order = $observer->getEvent()->getOrder();
+        $queueData = $observer->getEvent()->getQueueData();
 
         $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - Observer triggered for order: " . ($order ? $order->getIncrementId() : 'NULL'));
 
-        if (!$order || !$order->getId()) {
-            $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - No valid order found");
+        if (!$order) {
+            $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - No order found");
             return;
         }
 
-        $payment = $order->getPayment();
-        if (!$payment) {
-            $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - No payment found for order: " . $order->getIncrementId());
+        if (!$queueData || !is_array($queueData)) {
+            $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - No queue data provided for order: " . $order->getIncrementId());
             return;
         }
 
-        $paymentMethod = $payment->getMethod();
-        $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - Payment method: " . $paymentMethod . " for order: " . $order->getIncrementId());
+        $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - Processing queue data for order: " . $order->getIncrementId() . " - Data: " . json_encode($queueData));
 
-        // Process different multi-payment methods
-        switch ($paymentMethod) {
-            case 'vindi_vp_cardbankslippix':
-                $this->processCardBankSlipPix($order, $payment);
-                break;
-            case 'vindi_vp_cardpix':
-                $this->processCardPix($order, $payment);
-                break;
-            case 'vindi_vp_cardcard':
-                $this->processCardCard($order, $payment);
-                break;
-            default:
-                $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - Not a multi-payment method, skipping");
-                return;
-        }
-    }
-
-    /**
-     * Process CardBankSlipPix payment queue data
-     *
-     * @param \Magento\Sales\Model\Order $order
-     * @param \Magento\Sales\Model\Order\Payment $payment
-     * @return void
-     */
-    private function processCardBankSlipPix($order, $payment): void
-    {
-        $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - Processing CardBankSlipPix payment for order: " . $order->getIncrementId());
-
-        // Process Bolepix queue data if present
-        $bolepixQueueData = $payment->getAdditionalInformation('bolepix_queue_data');
-        if ($bolepixQueueData && is_array($bolepixQueueData)) {
-            $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - Found Bolepix queue data for order: " . $order->getIncrementId());
-            $this->processQueueData($order, $payment, $bolepixQueueData, 'Bolepix', 'bolepix_queue_data');
-        } else {
-            $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - No Bolepix queue data found for order: " . $order->getIncrementId());
-        }
-    }
-
-    /**
-     * Process CardPix payment queue data
-     *
-     * @param \Magento\Sales\Model\Order $order
-     * @param \Magento\Sales\Model\Order\Payment $payment
-     * @return void
-     */
-    private function processCardPix($order, $payment): void
-    {
-        $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - Processing CardPix payment for order: " . $order->getIncrementId());
-
-        // Process PIX queue data if present
-        $pixQueueData = $payment->getAdditionalInformation('pix_queue_data');
-        if ($pixQueueData && is_array($pixQueueData)) {
-            $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - Found PIX queue data for order: " . $order->getIncrementId());
-            $this->processQueueData($order, $payment, $pixQueueData, 'PIX', 'pix_queue_data');
-        } else {
-            $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - No PIX queue data found for order: " . $order->getIncrementId());
-        }
-    }
-
-    /**
-     * Process CardCard payment queue data
-     *
-     * @param \Magento\Sales\Model\Order $order
-     * @param \Magento\Sales\Model\Order\Payment $payment
-     * @return void
-     */
-    private function processCardCard($order, $payment): void
-    {
-        $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - Processing CardCard payment for order: " . $order->getIncrementId());
-        
-        // Log all additional information to debug
-        $allAdditionalInfo = $payment->getAdditionalInformation();
-        $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - All payment additional info for order " . $order->getIncrementId() . ": " . json_encode($allAdditionalInfo));
-
-        // Process Card2 queue data if present
-        $card2QueueData = $payment->getAdditionalInformation('card2_queue_data');
-        $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - Card2 queue data for order " . $order->getIncrementId() . ": " . json_encode($card2QueueData));
-        
-        if ($card2QueueData && is_array($card2QueueData)) {
-            $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - Found Card2 queue data for order: " . $order->getIncrementId());
-            $this->processQueueData($order, $payment, $card2QueueData, 'Card2', 'card2_queue_data');
-        } else {
-            $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - No Card2 queue data found for order: " . $order->getIncrementId());
-            $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - Card2QueueData type: " . gettype($card2QueueData) . ", is_array: " . (is_array($card2QueueData) ? 'true' : 'false'));
-        }
-    }
-
-    /**
-     * Process queue data and create queue record
-     *
-     * @param \Magento\Sales\Model\Order $order
-     * @param \Magento\Sales\Model\Order\Payment $payment
-     * @param array $queueData
-     * @param string $type
-     * @param string $additionalKey
-     * @return void
-     */
-    private function processQueueData($order, $payment, array $queueData, string $type, string $additionalKey): void
-    {
         try {
-            $orderId = $order->getId();
-            $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - Processing {$type} queue data for order: " . $order->getIncrementId() . " with order ID: " . ($orderId ?: 'NULL'));
+            // Use null for order_id if not available yet, will be updated later in response handler
+        $orderId = $order->getId() ?: 0;
 
-            if (!$orderId) {
-                $this->logger->error("CreateMultiPaymentQueueAfterOrderSave - Order ID is null or 0 for order: " . $order->getIncrementId());
-                return;
-            }
-
-            // Create the queue record now that we have the order ID
+            // Create the queue record with the provided data
             $this->multiPaymentQueueService->addToQueue(
-                (int)$orderId,
+                $orderId,
                 $queueData['increment_id'],
                 $queueData['payment_method'],
                 '', // Primary transaction ID will be set later when primary response comes
@@ -194,30 +89,23 @@ class CreateMultiPaymentQueueAfterOrderSave implements ObserverInterface
                 $queueData['status']
             );
 
-            $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - {$type} queue record created successfully for order: " . $order->getIncrementId());
-
-            // Remove the temporary data from payment additional information
-            $payment->unsAdditionalInformation($additionalKey);
-            $payment->save();
-
             $this->logger->info(
-                "CreateMultiPaymentQueueAfterOrderSave - {$type} queue record created after order save for order {$order->getIncrementId()}",
+                "CreateMultiPaymentQueueAfterOrderSave - Queue record created successfully for order {$order->getIncrementId()}",
                 [
-                    'order_id' => $order->getId(),
+                    'order_id' => $orderId,
                     'increment_id' => $order->getIncrementId(),
-                    'amount' => $queueData['secondary_amount'],
-                    'type' => $type
+                    'secondary_method_type' => $queueData['secondary_method_type'],
+                    'secondary_amount' => $queueData['secondary_amount']
                 ]
             );
 
         } catch (\Exception $e) {
             $this->logger->error(
-                "CreateMultiPaymentQueueAfterOrderSave - Failed to create {$type} queue record for order {$order->getIncrementId()}: {$e->getMessage()}",
+                "CreateMultiPaymentQueueAfterOrderSave - Failed to create queue record for order {$order->getIncrementId()}: {$e->getMessage()}",
                 [
-                    'order_id' => $order->getId(),
+                    'order_id' => $order->getId() ?: null,
                     'increment_id' => $order->getIncrementId(),
-                    'error' => $e->getMessage(),
-                    'type' => $type
+                    'error' => $e->getMessage()
                 ]
             );
         }

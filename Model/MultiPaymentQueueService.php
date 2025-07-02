@@ -160,6 +160,44 @@ class MultiPaymentQueueService
     }
 
     /**
+     * Get queue items by increment ID
+     *
+     * @param string $incrementId
+     * @return MultiPaymentQueue[]
+     */
+    public function getByIncrementId(string $incrementId): array
+    {
+        $collection = $this->collectionFactory->create();
+        $collection->addFieldToFilter('increment_id', $incrementId);
+
+        return $collection->getItems();
+    }
+
+    /**
+     * Save a queue item
+     *
+     * @param MultiPaymentQueue $queueItem
+     * @return MultiPaymentQueue
+     * @throws \Exception
+     */
+    public function save(MultiPaymentQueue $queueItem): MultiPaymentQueue
+    {
+        try {
+            $this->multiPaymentQueueResource->save($queueItem);
+        } catch (\Exception $e) {
+            $this->logger->error(
+                'Failed to save multi-payment queue item',
+                [
+                    'error' => $e->getMessage(),
+                    'queue_item_id' => $queueItem->getId()
+                ]
+            );
+            throw $e;
+        }
+        return $queueItem;
+    }
+
+    /**
      * Update queue item status
      *
      * @param MultiPaymentQueue $queueItem

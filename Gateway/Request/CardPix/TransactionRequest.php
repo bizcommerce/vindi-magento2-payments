@@ -382,9 +382,8 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         // Build PIX request data
         $pixRequestData = $this->buildPixRequestData($order, $payment, $amountPix);
 
-        // Store PIX queue data in payment additional information for later processing
-        // This will be processed after the order is saved via observer
-        $pixQueueData = [
+        // Prepare queue data for the event
+        $queueData = [
             'increment_id' => (string)$order->getIncrementId(),
             'payment_method' => 'vindi_vp_cardpix',
             'secondary_method_type' => MultiPaymentQueue::SECONDARY_METHOD_PIX,
@@ -393,11 +392,14 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
             'status' => MultiPaymentQueue::STATUS_PENDING
         ];
 
-        $payment->setAdditionalInformation('pix_queue_data', $pixQueueData);
+        // Dispatch custom event to process multi-payment queue immediately
+        $this->eventManager->dispatch('vindi_vp_process_multi_payment_queue', [
+            'order' => $order,
+            'queue_data' => $queueData
+        ]);
 
-        // Log the queue operation
         $this->logger->info(
-            "CardPix - PIX payment data prepared for queue for order {$order->getIncrementId()} with amount: {$amountPix}",
+            "CardPix - Custom event 'vindi_vp_process_multi_payment_queue' dispatched for order {$order->getIncrementId()} with PIX amount: {$amountPix}",
             ['increment_id' => $order->getIncrementId(), 'amount_pix' => $amountPix]
         );
     }
