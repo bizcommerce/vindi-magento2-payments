@@ -319,7 +319,9 @@ class ProcessMultiPaymentQueue
             return false;
         }
 
-        return isset($response['status_id']) && in_array($response['status_id'], [1, 6, 11]); // captured, authorized, or pending
+        $statusId = $response['transaction']['status_id'] ?? $response['status_id'] ?? null;
+
+        return in_array($statusId, [1, 6, 11]); // 1 - captured, 6 - authorized, 11 - pending_capture
     }
 
     /**

@@ -393,6 +393,27 @@ class Order extends \Magento\Payment\Helper\Data
     }
 
     /**
+     * Update multi-payment additional information in Payment.
+     *
+     * @param Payment $payment
+     * @param array $content
+     * @return Payment
+     */
+    public function updateMultiPaymentAdditionalInfo(Payment $payment, array $content): Payment
+    {
+        try {
+            if (isset($content['payment'])) {
+                $paymentResponse = $content['payment'];
+                $payment->setAdditionalInformation('multi_payment_url', $paymentResponse['url_payment']);
+            }
+        } catch (\Exception $e) {
+            $this->_logger->warning($e->getMessage());
+        }
+
+        return $payment;
+    }
+
+    /**
      * Update bank slip additional information in Payment.
      *
      * @param Payment $payment

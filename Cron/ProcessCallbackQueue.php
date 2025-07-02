@@ -7,6 +7,8 @@ use Magento\Framework\Filesystem\Driver\File as FileDriver;
 use Magento\Framework\App\ResourceConnection;
 use Vindi\VP\Logger\Logger;
 use Vindi\VP\Helper\Order as HelperOrder;
+use Vindi\VP\Model\Webhook\MultiPaymentHandler;
+use Vindi\VP\Model\MultiPaymentQueueService;
 
 class ProcessCallbackQueue
 {
@@ -31,23 +33,39 @@ class ProcessCallbackQueue
     protected $fileDriver;
 
     /**
+     * @var MultiPaymentHandler
+     */
+    private $multiPaymentHandler;
+
+    /**
+     * @var MultiPaymentQueueService
+     */
+    private $multiPaymentQueueService;
+
+    /**
      * Constructor.
      *
      * @param ResourceConnection $resource
      * @param Logger $logger
      * @param HelperOrder $helperOrder
      * @param FileDriver $fileDriver
+     * @param MultiPaymentHandler $multiPaymentHandler
+     * @param MultiPaymentQueueService $multiPaymentQueueService
      */
     public function __construct(
         ResourceConnection $resource,
         Logger $logger,
         HelperOrder $helperOrder,
-        FileDriver $fileDriver
+        FileDriver $fileDriver,
+        MultiPaymentHandler $multiPaymentHandler,
+        MultiPaymentQueueService $multiPaymentQueueService
     ) {
         $this->resource = $resource;
         $this->logger = $logger;
         $this->helperOrder = $helperOrder;
         $this->fileDriver = $fileDriver;
+        $this->multiPaymentHandler = $multiPaymentHandler;
+        $this->multiPaymentQueueService = $multiPaymentQueueService;
     }
 
     /**
@@ -90,16 +108,40 @@ class ProcessCallbackQueue
 
                     if (isset($params['transaction'])) {
                         $transaction = $params['transaction'];
-                        $orderIncrementId = $transaction['order_number'] ?? ($transaction['free'] ?? '');
-                        $order = $this->helperOrder->loadOrder($orderIncrementId);
+                        $transactionId = $transaction['order_number'] ?? ($transaction['free'] ?? '');
+                        $statusId = $transaction['status_id'];
 
-                        if ($order && $order->getId()) {
-                            $vindiStatus = $transaction['status_id'] ?? '';
-                            $amount = $transaction['price_original'] ?? $order->getGrandTotal();
-                            $this->helperOrder->updateOrder($order, $vindiStatus, $transaction, (float)$amount, true);
-                            $this->logger->info(__('Callback ID %1 processed successfully. Order %2 updated.', $callbackId, $orderIncrementId));
+                        // Check if it's a multi-payment webhook
+                        if (preg_match('/(.*?)-(\d{2})$/', $transactionId, $matches)) {
+                            $orderIncrementId = $matches[1];
+                            $this->logger->info(__('Multi-payment webhook detected for order %1.', $orderIncrementId));
+
+                            $order = $this->helperOrder->loadOrder($orderIncrementId);
+                            if (!$order || !$order->getId()) {
+                                throw new \Exception((string) __('Order %1 not found for multi-payment callback.', $orderIncrementId));
+                            }
+
+                            if ($statusId == HelperOrder::STATUS_APPROVED) {
+                                $this->multiPaymentHandler->processSuccess($order, $transaction);
+                            } else {
+                                $this->multiPaymentHandler->processFailure($order, $transaction);
+                            }
+
                         } else {
-                            $this->logger->warning(__('Order not found for callback ID %1 with order number %2.', $callbackId, $orderIncrementId));
+                            // Standard payment webhook logic
+                            $order = $this->helperOrder->loadOrder($transactionId);
+                            if ($order && $order->getId()) {
+                                $this->helperOrder->updateOrder(
+                                    $order,
+                                    (string)$statusId,
+                                    $transaction,
+                                    (float)($transaction['transaction_total_value'] ?? $order->getGrandTotal()),
+                                    true
+                                );
+                                $this->logger->info(__('Callback ID %1 processed successfully. Order %2 updated.', $callbackId, $transactionId));
+                            } else {
+                                $this->logger->warning(__('Order %1 not found for callback ID %2.', $transactionId, $callbackId));
+                            }
                         }
                     } else {
                         $this->logger->warning(__('Transaction data missing in callback ID %1.', $callbackId));
@@ -119,7 +161,6 @@ class ProcessCallbackQueue
                             ['queue_status' => 'failed'],
                             ['entity_id = ?' => $callbackId]
                         );
-                        $this->logger->error(__('Callback ID %1 marked as failed after %2 attempts.', $callbackId, $attempts + 1));
                     }
                 }
             }
