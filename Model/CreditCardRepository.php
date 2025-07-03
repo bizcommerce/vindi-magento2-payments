@@ -62,7 +62,7 @@ class CreditCardRepository implements CreditCardRepositoryInterface
      * @return CreditCardInterface
      * @throws NoSuchEntityException
      */
-    public function getById($id): CreditCardInterface
+    public function getById($id)
     {
         $creditCard = $this->creditCardFactory->create();
         $this->creditCardResource->load($creditCard, $id);
