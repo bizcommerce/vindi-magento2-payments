@@ -34,7 +34,8 @@ define(
         'Magento_Checkout/js/model/payment/additional-validators',
         'mage/mage',
         'mage/validation',
-        'vindi_vp/validation'
+        'vindi_vp/validation',
+        'jquery/jquery.mask'
     ],
     function (
         _,
@@ -1593,86 +1594,23 @@ define(
              * @returns {boolean}
              */
             validateCpfLocal: function(cpf) {
-                // CPFs inválidos conhecidos
-                var invalidCpfs = [
-                    "00000000000", "11111111111", "22222222222", "33333333333",
-                    "44444444444", "55555555555", "66666666666", "77777777777",
-                    "88888888888", "99999999999"
-                ];
-
-                if (invalidCpfs.indexOf(cpf) !== -1) {
-                    return false;
-                }
-
-                var sum = 0;
-                var remainder;
-
-                // Validação do primeiro dígito
-                for (var i = 1; i <= 9; i++) {
-                    sum += parseInt(cpf[i - 1]) * (11 - i);
-                }
-                remainder = (sum * 10) % 11;
-                if (remainder === 10 || remainder === 11) remainder = 0;
-                if (remainder !== parseInt(cpf[9])) return false;
-
-                // Validação do segundo dígito
-                sum = 0;
-                for (i = 1; i <= 10; i++) {
-                    sum += parseInt(cpf[i - 1]) * (12 - i);
-                }
-                remainder = (sum * 10) % 11;
-                if (remainder === 10 || remainder === 11) remainder = 0;
-                if (remainder !== parseInt(cpf[10])) return false;
-
-                return true;
+                return cpf.length === 11;
             },
 
-            /**
-             * Validar CNPJ localmente
-             * @param {string} cnpj
-             * @returns {boolean}
-             */
             validateCnpjLocal: function(cnpj) {
-                // CNPJs inválidos conhecidos
-                var invalidCnpjs = [
-                    "00000000000000", "11111111111111", "22222222222222", "33333333333333",
-                    "44444444444444", "55555555555555", "66666666666666", "77777777777777",
-                    "88888888888888", "99999999999999"
-                ];
+                return cnpj.length === 14;
+            },
 
-                if (invalidCnpjs.indexOf(cnpj) !== -1) {
-                    return false;
-                }
+            initializeMasks: function() {
+                var self = this;
+                $('#' + self.getCode() + '_cc_exp_date').mask('00/00');
+                $('#' + self.getCode() + '_second_cc_exp_date').mask('00/00');
+            },
 
-                var length = cnpj.length - 2;
-                var numbers = cnpj.substring(0, length);
-                var digits = cnpj.substring(length);
-                var sum = 0;
-                var pos = length - 7;
-
-                for (var i = length; i >= 1; i--) {
-                    sum += numbers.charAt(length - i) * pos--;
-                    if (pos < 2) pos = 9;
-                }
-
-                var result = sum % 11 < 2 ? 0 : 11 - sum % 11;
-                if (result != digits.charAt(0)) return false;
-
-                length = length + 1;
-                numbers = cnpj.substring(0, length);
-                sum = 0;
-                pos = length - 7;
-                for (i = length; i >= 1; i--) {
-                    sum += numbers.charAt(length - i) * pos--;
-                    if (pos < 2) pos = 9;
-                }
-                result = sum % 11 < 2 ? 0 : 11 - sum % 11;
-                if (result != digits.charAt(1)) return false;
-
-                return true;
+            afterRender: function() {
+                var self = this;
+                self.initializeMasks();
             }
-
-            // ...existing code...
         });
     }
 );

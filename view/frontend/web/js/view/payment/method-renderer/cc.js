@@ -34,7 +34,8 @@ define(
         'Magento_Checkout/js/model/payment/additional-validators',
         'mage/mage',
         'mage/validation',
-        'vindi_vp/validation'
+        'vindi_vp/validation',
+        'jquery/jquery.mask'
     ],
     function (
         _,
@@ -342,30 +343,21 @@ define(
              * @returns {Array}
              */
             getPaymentProfiles: function () {
-                var paymentProfiles = [];
-                var savedCards = window.checkoutConfig &&
-                    window.checkoutConfig.payment &&
-                    window.checkoutConfig.payment.vindi_vp_cc &&
-                    window.checkoutConfig.payment.vindi_vp_cc.saved_cards;
-
-                if (savedCards && Array.isArray(savedCards)) {
-                    savedCards.forEach(function (card) {
-                        paymentProfiles.push({
-                            'value': card.id,
-                            'text': card.card_type + ' xxxx-' + card.card_number,
-                            'card_type': card.card_type
-                        });
-                    });
-                }
-                return paymentProfiles;
+                return this.paymentProfiles;
             },
 
-            /**
-             * Check if user has payment profiles
-             * @returns {boolean}
-             */
             hasPaymentProfiles: function () {
-                return this.getPaymentProfiles().length > 0;
+                return this.paymentProfiles.length > 0;
+            },
+
+            initializeMasks: function() {
+                var self = this;
+                $('#' + self.getCode() + '_cc_exp_date').mask('00/00');
+            },
+
+            afterRender: function() {
+                var self = this;
+                self.initializeMasks();
             }
         });
     }

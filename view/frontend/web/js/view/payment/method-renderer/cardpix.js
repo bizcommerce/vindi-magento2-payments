@@ -735,7 +735,8 @@ define(
              * After render callback
              */
             afterRender: function() {
-                this.initializeMasks();
+                var self = this;
+                self.initializeMasks();
             }
         });
     }
