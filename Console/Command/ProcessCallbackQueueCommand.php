@@ -8,6 +8,8 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Psr\Log\LoggerInterface;
+use Magento\Framework\App\State as AppState;
+use Magento\Framework\App\Area;
 
 /**
  * Command to execute the vindi_vp_process_callback_queue cron job manually.
@@ -25,17 +27,25 @@ class ProcessCallbackQueueCommand extends Command
     private $logger;
 
     /**
+     * @var AppState
+     */
+    private $appState;
+
+    /**
      * Constructor.
      *
      * @param ProcessCallbackQueue $processCallbackQueue
      * @param LoggerInterface $logger
+     * @param AppState $appState
      */
     public function __construct(
         ProcessCallbackQueue $processCallbackQueue,
-        LoggerInterface $logger
+        LoggerInterface $logger,
+        AppState $appState
     ) {
         $this->processCallbackQueue = $processCallbackQueue;
         $this->logger = $logger;
+        $this->appState = $appState;
         parent::__construct();
     }
 
@@ -59,6 +69,7 @@ class ProcessCallbackQueueCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         try {
+            $this->appState->setAreaCode(Area::AREA_ADMINHTML);
             $this->processCallbackQueue->execute();
             $output->writeln('<info>Callback queue processing executed successfully.</info>');
             return Cli::RETURN_SUCCESS;
