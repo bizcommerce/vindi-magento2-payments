@@ -222,6 +222,7 @@ class MultiPaymentQueueService
             $queueItem->setErrorMessage($errorMessage);
         }
 
+        // If status is failed and can retry, set next attempt time
         if ($status === MultiPaymentQueue::STATUS_FAILED && $queueItem->canRetry()) {
             // Set next attempt time (exponential backoff: 2^attempts minutes)
             $delayMinutes = pow(2, $queueItem->getAttempts());
@@ -229,12 +230,28 @@ class MultiPaymentQueueService
             $queueItem->setNextAttemptAt($nextAttempt);
         }
 
+        // For successful execution, clear error message and next attempt
+        if ($status === MultiPaymentQueue::STATUS_EXECUTED) {
+            $queueItem->setErrorMessage(null);
+            $queueItem->setNextAttemptAt(null);
+        }
+
         try {
             $this->multiPaymentQueueResource->save($queueItem);
+            
+            $this->logger->info('Multi-payment queue item status updated', [
+                'queue_item_id' => $queueItem->getId(),
+                'new_status' => $status,
+                'attempts' => $queueItem->getAttempts(),
+                'has_response_data' => !empty($responseData),
+                'error_message' => $errorMessage
+            ]);
+            
         } catch (\Exception $e) {
             $this->logger->error('Failed to update multi-payment queue item', [
                 'error' => $e->getMessage(),
-                'queue_item_id' => $queueItem->getId()
+                'queue_item_id' => $queueItem->getId(),
+                'intended_status' => $status
             ]);
             throw $e;
         }

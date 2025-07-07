@@ -372,4 +372,25 @@ class MultiPaymentQueue extends AbstractModel
     {
         return $this->setStatus(self::STATUS_PROCESSING);
     }
+
+    /**
+     * Get entity ID
+     *
+     * @return int|null
+     */
+    public function getId()
+    {
+        return $this->getData('entity_id');
+    }
+
+    /**
+     * Set entity ID
+     *
+     * @param int $id
+     * @return $this
+     */
+    public function setId($id)
+    {
+        return $this->setData('entity_id', $id);
+    }
 }

@@ -42,6 +42,7 @@
                 <item name="vindi:vp:clear-old-access-tokens" xsi:type="object">Vindi\VP\Console\Command\ClearOldAccessTokensCommand</item>
                 <item name="vindi:process-callback-queue" xsi:type="object">Vindi\VP\Console\Command\ProcessCallbackQueueCommand</item>
                 <item name="vindi:process-multi-payment-queue" xsi:type="object">Vindi\VP\Console\Command\ProcessMultiPaymentQueue</item>
+                <item name="vindi:debug-multi-payment-queue" xsi:type="object">Vindi\VP\Console\Command\DebugMultiPaymentQueue</item>
             </argument>
         </arguments>
     </type>
