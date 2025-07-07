@@ -18,6 +18,7 @@ namespace Vindi\VP\Gateway\Http\Client;
 use Vindi\VP\Gateway\Http\Client\Api\Create;
 use Vindi\VP\Gateway\Http\Client\Api\Query;
 use Vindi\VP\Gateway\Http\Client\Api\Refund;
+use Vindi\VP\Gateway\Http\Client\Api\Cancel;
 use Vindi\VP\Gateway\Http\Client\Api\Installments;
 use Vindi\VP\Gateway\Http\Client\Api\Track;
 use Vindi\VP\Gateway\Http\Client\Api\Token;
@@ -39,6 +40,11 @@ class Api
      * @var Refund
      */
     private $refund;
+
+    /**
+     * @var Cancel
+     */
+    private $cancel;
 
     /**
      * @var Installments
@@ -64,6 +70,7 @@ class Api
         Logger $logger,
         Create $create,
         Refund $refund,
+        Cancel $cancel,
         Installments $installments,
         Query $query,
         Track $track,
@@ -72,6 +79,7 @@ class Api
         $this->logger = $logger;
         $this->create = $create;
         $this->refund = $refund;
+        $this->cancel = $cancel;
         $this->installments = $installments;
         $this->query = $query;
         $this->track = $track;
@@ -91,6 +99,11 @@ class Api
     public function refund(): Refund
     {
         return $this->refund;
+    }
+
+    public function cancel(): Cancel
+    {
+        return $this->cancel;
     }
 
     public function track(): Track

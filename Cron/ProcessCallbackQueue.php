@@ -9,6 +9,7 @@ use Vindi\VP\Logger\Logger;
 use Vindi\VP\Helper\Order as HelperOrder;
 use Vindi\VP\Model\Webhook\MultiPaymentHandler;
 use Vindi\VP\Model\MultiPaymentQueueService;
+use Vindi\VP\Model\CancellationService;
 
 class ProcessCallbackQueue
 {
@@ -43,6 +44,11 @@ class ProcessCallbackQueue
     private $multiPaymentQueueService;
 
     /**
+     * @var CancellationService
+     */
+    private $cancellationService;
+
+    /**
      * Constructor.
      *
      * @param ResourceConnection $resource
@@ -51,6 +57,7 @@ class ProcessCallbackQueue
      * @param FileDriver $fileDriver
      * @param MultiPaymentHandler $multiPaymentHandler
      * @param MultiPaymentQueueService $multiPaymentQueueService
+     * @param CancellationService $cancellationService
      */
     public function __construct(
         ResourceConnection $resource,
@@ -58,7 +65,8 @@ class ProcessCallbackQueue
         HelperOrder $helperOrder,
         FileDriver $fileDriver,
         MultiPaymentHandler $multiPaymentHandler,
-        MultiPaymentQueueService $multiPaymentQueueService
+        MultiPaymentQueueService $multiPaymentQueueService,
+        CancellationService $cancellationService
     ) {
         $this->resource = $resource;
         $this->logger = $logger;
@@ -66,6 +74,7 @@ class ProcessCallbackQueue
         $this->fileDriver = $fileDriver;
         $this->multiPaymentHandler = $multiPaymentHandler;
         $this->multiPaymentQueueService = $multiPaymentQueueService;
+        $this->cancellationService = $cancellationService;
     }
 
     /**
@@ -123,6 +132,14 @@ class ProcessCallbackQueue
 
                             if ($statusId == HelperOrder::STATUS_APPROVED) {
                                 $this->multiPaymentHandler->processSuccess($order, $transaction);
+                            } elseif ($statusId == HelperOrder::STATUS_REFUNDED) {
+                                // Process refund/cancellation via CancellationService
+                                $this->logger->info(__('Processing refund webhook for order %1.', $orderIncrementId));
+                                try {
+                                    $this->cancellationService->processWebhookCancellation($params);
+                                } catch (\Exception $cancelException) {
+                                    $this->logger->error(__('Failed to process cancellation for order %1: %2', $orderIncrementId, $cancelException->getMessage()));
+                                }
                             } else {
                                 $this->multiPaymentHandler->processFailure($order, $transaction);
                             }
@@ -131,13 +148,23 @@ class ProcessCallbackQueue
                             // Standard payment webhook logic
                             $order = $this->helperOrder->loadOrder($transactionId);
                             if ($order && $order->getId()) {
-                                $this->helperOrder->updateOrder(
-                                    $order,
-                                    (string)$statusId,
-                                    $transaction,
-                                    (float)($transaction['transaction_total_value'] ?? $order->getGrandTotal()),
-                                    true
-                                );
+                                if ($statusId == HelperOrder::STATUS_REFUNDED) {
+                                    // Process refund/cancellation via CancellationService
+                                    $this->logger->info(__('Processing refund webhook for transaction %1.', $transactionId));
+                                    try {
+                                        $this->cancellationService->processWebhookCancellation($params);
+                                    } catch (\Exception $cancelException) {
+                                        $this->logger->error(__('Failed to process cancellation for transaction %1: %2', $transactionId, $cancelException->getMessage()));
+                                    }
+                                } else {
+                                    $this->helperOrder->updateOrder(
+                                        $order,
+                                        (string)$statusId,
+                                        $transaction,
+                                        (float)($transaction['transaction_total_value'] ?? $order->getGrandTotal()),
+                                        true
+                                    );
+                                }
                                 $this->logger->info(__('Callback ID %1 processed successfully. Order %2 updated.', $callbackId, $transactionId));
                             } else {
                                 $this->logger->warning(__('Order %1 not found for callback ID %2.', $transactionId, $callbackId));

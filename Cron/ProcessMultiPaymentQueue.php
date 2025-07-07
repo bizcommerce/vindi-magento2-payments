@@ -447,7 +447,9 @@ class ProcessMultiPaymentQueue
         $this->vindiLogger->execute([
             'secondary_method' => $secondaryMethodType,
             'response_structure' => array_keys($response),
-            'response' => $response
+            'data_response_keys' => isset($response['data_response']) ? array_keys($response['data_response']) : 'not_found',
+            'transaction_keys' => isset($response['data_response']['transaction']) ? array_keys($response['data_response']['transaction']) : 'not_found',
+            'payment_keys' => isset($response['data_response']['transaction']['payment']) ? array_keys($response['data_response']['transaction']['payment']) : 'not_found'
         ], 'multi-payment-queue');
 
         // Check for explicit error
@@ -472,9 +474,11 @@ class ProcessMultiPaymentQueue
                 return $this->isBankslipResponseSuccessful($response);
                 
             default:
-                // Fallback to original logic
-                $statusId = $response['transaction']['status_id'] ?? $response['status_id'] ?? null;
-                $isSuccess = in_array($statusId, [1, 6, 11]);
+                // Fallback to original logic with updated status locations
+                $statusId = $response['data_response']['transaction']['status_id'] ?? 
+                           $response['transaction']['status_id'] ?? 
+                           $response['status_id'] ?? null;
+                $isSuccess = in_array($statusId, [1, 4, 6, 11]); // Added status 4 for "Aguardando Pagamento"
                 
                 $this->vindiLogger->execute('Using fallback status verification', 'multi-payment-queue');
                 $this->vindiLogger->execute([
@@ -494,25 +498,47 @@ class ProcessMultiPaymentQueue
      */
     private function isPixResponseSuccessful(array $response): bool
     {
-        $hasPixCode = !empty($response['pix_code']);
-        $hasPixUrl = !empty($response['pix_url']);
-        $hasValidStatus = true;
+        // Check for PIX data in the actual API structure
+        $pixCode = $response['data_response']['transaction']['payment']['qrcode_original_path'] ?? 
+                   $response['qrcode_original_path'] ?? 
+                   $response['pix_code'] ?? null;
+                   
+        $pixUrl = $response['data_response']['transaction']['payment']['url_payment'] ?? 
+                  $response['url_payment'] ?? 
+                  $response['pix_url'] ?? null;
+                  
+        $qrCodePath = $response['data_response']['transaction']['payment']['qrcode_path'] ?? 
+                      $response['qrcode_path'] ?? null;
         
-        // Check status if present
-        if (isset($response['status_id'])) {
-            $hasValidStatus = in_array($response['status_id'], [1, 6, 11]);
-        } elseif (isset($response['transaction']['status_id'])) {
-            $hasValidStatus = in_array($response['transaction']['status_id'], [1, 6, 11]);
-        }
+        $hasPixCode = !empty($pixCode);
+        $hasPixUrl = !empty($pixUrl);
+        $hasQrCode = !empty($qrCodePath);
         
-        $isSuccess = $hasPixCode && $hasPixUrl && $hasValidStatus;
+        // For PIX, having either qrcode_original_path OR url_payment is sufficient
+        $hasPixData = $hasPixCode || $hasPixUrl || $hasQrCode;
+        
+        // Check status in the actual API structure - PIX aguardando pagamento (status 4) é válido
+        $statusId = $response['data_response']['transaction']['status_id'] ?? 
+                   $response['transaction']['status_id'] ?? 
+                   $response['status_id'] ?? null;
+        
+        // PIX valid statuses: 1=captured, 4=aguardando_pagamento, 6=authorized, 11=pending_capture
+        $hasValidStatus = in_array($statusId, [1, 4, 6, 11]);
+        
+        $isSuccess = $hasPixData && $hasValidStatus;
         
         $this->vindiLogger->execute('PIX response validation', 'multi-payment-queue');
         $this->vindiLogger->execute([
-            'has_pix_code' => $hasPixCode,
-            'has_pix_url' => $hasPixUrl,
+            'pix_code_present' => $hasPixCode,
+            'pix_url_present' => $hasPixUrl,
+            'qr_code_present' => $hasQrCode,
+            'has_pix_data' => $hasPixData,
+            'status_id' => $statusId,
             'has_valid_status' => $hasValidStatus,
-            'is_success' => $isSuccess
+            'is_success' => $isSuccess,
+            'pix_code_field' => !empty($pixCode) ? 'found' : 'not_found',
+            'pix_url_field' => !empty($pixUrl) ? 'found' : 'not_found',
+            'qr_code_field' => !empty($qrCodePath) ? 'found' : 'not_found'
         ], 'multi-payment-queue');
         
         return $isSuccess;
@@ -526,24 +552,39 @@ class ProcessMultiPaymentQueue
      */
     private function isBolepixResponseSuccessful(array $response): bool
     {
-        $hasBankslipUrl = !empty($response['bankslip_url']);
-        $hasPixCode = !empty($response['pix_code']);
-        $hasValidStatus = true;
+        // Check for Bolepix data in the actual API structure
+        $bankslipUrl = $response['data_response']['transaction']['payment']['bankslip_url'] ?? 
+                      $response['bankslip_url'] ?? null;
+                      
+        $pixCode = $response['data_response']['transaction']['payment']['qrcode_original_path'] ?? 
+                  $response['qrcode_original_path'] ?? 
+                  $response['pix_code'] ?? null;
+                  
+        $pixUrl = $response['data_response']['transaction']['payment']['url_payment'] ?? 
+                 $response['url_payment'] ?? 
+                 $response['pix_url'] ?? null;
         
-        // Check status if present
-        if (isset($response['status_id'])) {
-            $hasValidStatus = in_array($response['status_id'], [1, 6, 11]);
-        } elseif (isset($response['transaction']['status_id'])) {
-            $hasValidStatus = in_array($response['transaction']['status_id'], [1, 6, 11]);
-        }
+        $hasBankslipUrl = !empty($bankslipUrl);
+        $hasPixCode = !empty($pixCode);
+        $hasPixUrl = !empty($pixUrl);
         
-        // For Bolepix, we need either bankslip URL or PIX code (or both)
-        $isSuccess = ($hasBankslipUrl || $hasPixCode) && $hasValidStatus;
+        // Check status in the actual API structure
+        $statusId = $response['data_response']['transaction']['status_id'] ?? 
+                   $response['transaction']['status_id'] ?? 
+                   $response['status_id'] ?? null;
+        
+        // Bolepix valid statuses: 1=captured, 4=aguardando_pagamento, 6=authorized, 11=pending_capture
+        $hasValidStatus = in_array($statusId, [1, 4, 6, 11]);
+        
+        // For Bolepix, we need either bankslip URL or PIX data (or both)
+        $isSuccess = ($hasBankslipUrl || $hasPixCode || $hasPixUrl) && $hasValidStatus;
         
         $this->vindiLogger->execute('Bolepix response validation', 'multi-payment-queue');
         $this->vindiLogger->execute([
             'has_bankslip_url' => $hasBankslipUrl,
             'has_pix_code' => $hasPixCode,
+            'has_pix_url' => $hasPixUrl,
+            'status_id' => $statusId,
             'has_valid_status' => $hasValidStatus,
             'is_success' => $isSuccess
         ], 'multi-payment-queue');
@@ -559,15 +600,26 @@ class ProcessMultiPaymentQueue
      */
     private function isCardResponseSuccessful(array $response): bool
     {
-        $statusId = $response['transaction']['status_id'] ?? $response['status_id'] ?? null;
-        $hasTransactionId = !empty($response['transaction_id']) || !empty($response['tid']) || 
-                           !empty($response['transaction']['id']);
+        // Check status in the actual API structure
+        $statusId = $response['data_response']['transaction']['status_id'] ?? 
+                   $response['transaction']['status_id'] ?? 
+                   $response['status_id'] ?? null;
+                   
+        // Check transaction ID in various possible locations
+        $transactionId = $response['data_response']['transaction']['transaction_id'] ?? 
+                        $response['transaction_id'] ?? 
+                        $response['tid'] ?? 
+                        $response['transaction']['id'] ?? null;
         
+        $hasTransactionId = !empty($transactionId);
+        
+        // Card valid statuses: 1=captured, 6=authorized, 11=pending_capture
         $isSuccess = in_array($statusId, [1, 6, 11]) && $hasTransactionId;
         
         $this->vindiLogger->execute('Card response validation', 'multi-payment-queue');
         $this->vindiLogger->execute([
             'status_id' => $statusId,
+            'transaction_id' => $transactionId,
             'has_transaction_id' => $hasTransactionId,
             'is_success' => $isSuccess
         ], 'multi-payment-queue');
@@ -583,16 +635,24 @@ class ProcessMultiPaymentQueue
      */
     private function isBankslipResponseSuccessful(array $response): bool
     {
-        $hasBankslipUrl = !empty($response['bankslip_url']);
-        $hasBankslipCode = !empty($response['bankslip_code']);
-        $hasValidStatus = true;
+        // Check for Bankslip data in the actual API structure
+        $bankslipUrl = $response['data_response']['transaction']['payment']['bankslip_url'] ?? 
+                      $response['bankslip_url'] ?? null;
+                      
+        $bankslipCode = $response['data_response']['transaction']['payment']['bankslip_code'] ?? 
+                       $response['bankslip_code'] ?? 
+                       $response['linha_digitavel'] ?? null;
         
-        // Check status if present
-        if (isset($response['status_id'])) {
-            $hasValidStatus = in_array($response['status_id'], [1, 6, 11]);
-        } elseif (isset($response['transaction']['status_id'])) {
-            $hasValidStatus = in_array($response['transaction']['status_id'], [1, 6, 11]);
-        }
+        $hasBankslipUrl = !empty($bankslipUrl);
+        $hasBankslipCode = !empty($bankslipCode);
+        
+        // Check status in the actual API structure
+        $statusId = $response['data_response']['transaction']['status_id'] ?? 
+                   $response['transaction']['status_id'] ?? 
+                   $response['status_id'] ?? null;
+        
+        // Bankslip valid statuses: 1=captured, 4=aguardando_pagamento, 6=authorized, 11=pending_capture
+        $hasValidStatus = in_array($statusId, [1, 4, 6, 11]);
         
         $isSuccess = $hasBankslipUrl && $hasValidStatus;
         
@@ -600,6 +660,7 @@ class ProcessMultiPaymentQueue
         $this->vindiLogger->execute([
             'has_bankslip_url' => $hasBankslipUrl,
             'has_bankslip_code' => $hasBankslipCode,
+            'status_id' => $statusId,
             'has_valid_status' => $hasValidStatus,
             'is_success' => $isSuccess
         ], 'multi-payment-queue');
@@ -618,29 +679,55 @@ class ProcessMultiPaymentQueue
     {
         $summary = [
             'secondary_method' => $secondaryMethodType,
-            'has_error' => isset($response['error']) && $response['error']
+            'has_error' => isset($response['error']) && $response['error'],
+            'status_id' => $response['data_response']['transaction']['status_id'] ?? 
+                          $response['transaction']['status_id'] ?? 
+                          $response['status_id'] ?? 'not_found'
         ];
 
         switch ($secondaryMethodType) {
             case MultiPaymentQueue::SECONDARY_METHOD_PIX:
-                $summary['pix_code_present'] = !empty($response['pix_code']);
-                $summary['pix_url_present'] = !empty($response['pix_url']);
+                $pixCode = $response['data_response']['transaction']['payment']['qrcode_original_path'] ?? 
+                          $response['qrcode_original_path'] ?? 
+                          $response['pix_code'] ?? null;
+                $pixUrl = $response['data_response']['transaction']['payment']['url_payment'] ?? 
+                         $response['url_payment'] ?? 
+                         $response['pix_url'] ?? null;
+                $qrCodePath = $response['data_response']['transaction']['payment']['qrcode_path'] ?? 
+                             $response['qrcode_path'] ?? null;
+                             
+                $summary['pix_code_present'] = !empty($pixCode);
+                $summary['pix_url_present'] = !empty($pixUrl);
+                $summary['qr_code_present'] = !empty($qrCodePath);
                 break;
                 
             case MultiPaymentQueue::SECONDARY_METHOD_BOLEPIX:
-                $summary['bankslip_url_present'] = !empty($response['bankslip_url']);
-                $summary['pix_code_present'] = !empty($response['pix_code']);
+                $bankslipUrl = $response['data_response']['transaction']['payment']['bankslip_url'] ?? 
+                              $response['bankslip_url'] ?? null;
+                $pixCode = $response['data_response']['transaction']['payment']['qrcode_original_path'] ?? 
+                          $response['qrcode_original_path'] ?? 
+                          $response['pix_code'] ?? null;
+                          
+                $summary['bankslip_url_present'] = !empty($bankslipUrl);
+                $summary['pix_code_present'] = !empty($pixCode);
                 break;
                 
             case MultiPaymentQueue::SECONDARY_METHOD_CARD:
             case MultiPaymentQueue::SECONDARY_METHOD_CARD2:
-                $summary['transaction_id'] = $response['transaction_id'] ?? $response['tid'] ?? 'N/A';
-                $summary['status_id'] = $response['transaction']['status_id'] ?? $response['status_id'] ?? 'N/A';
+                $transactionId = $response['data_response']['transaction']['transaction_id'] ?? 
+                                $response['transaction_id'] ?? 
+                                $response['tid'] ?? 'N/A';
+                $summary['transaction_id'] = $transactionId;
                 break;
                 
             case MultiPaymentQueue::SECONDARY_METHOD_BANKSLIP:
-                $summary['bankslip_url_present'] = !empty($response['bankslip_url']);
-                $summary['bankslip_code_present'] = !empty($response['bankslip_code']);
+                $bankslipUrl = $response['data_response']['transaction']['payment']['bankslip_url'] ?? 
+                              $response['bankslip_url'] ?? null;
+                $bankslipCode = $response['data_response']['transaction']['payment']['bankslip_code'] ?? 
+                               $response['bankslip_code'] ?? null;
+                               
+                $summary['bankslip_url_present'] = !empty($bankslipUrl);
+                $summary['bankslip_code_present'] = !empty($bankslipCode);
                 break;
         }
 
@@ -655,20 +742,23 @@ class ProcessMultiPaymentQueue
      */
     private function extractErrorMessage(array $response): string
     {
-        // Check various possible error message locations
+        // Check various possible error message locations including new API structure
         $errorSources = [
             'message',
             'error_message', 
             'status_reason',
             'error_description',
             'errors',
+            'message_response.message',
+            'data_response.message',
+            'data_response.error_message',
             'transaction.error_message',
             'transaction.status_reason'
         ];
 
         foreach ($errorSources as $source) {
             if (strpos($source, '.') !== false) {
-                // Handle nested properties like 'transaction.error_message'
+                // Handle nested properties like 'data_response.error_message'
                 $parts = explode('.', $source);
                 $value = $response;
                 foreach ($parts as $part) {
@@ -690,10 +780,21 @@ class ProcessMultiPaymentQueue
             }
         }
 
-        // If no specific error message found, try to extract from status
-        $statusId = $response['transaction']['status_id'] ?? $response['status_id'] ?? null;
-        if ($statusId && !in_array($statusId, [1, 6, 11])) {
-            return "Payment failed with status ID: {$statusId}";
+        // If no specific error message found, try to extract from status in new structure
+        $statusId = $response['data_response']['transaction']['status_id'] ?? 
+                   $response['transaction']['status_id'] ?? 
+                   $response['status_id'] ?? null;
+                   
+        $statusName = $response['data_response']['transaction']['status_name'] ?? null;
+        
+        if ($statusId && !in_array($statusId, [1, 4, 6, 11])) {
+            $statusText = $statusName ? " ({$statusName})" : '';
+            return "Payment failed with status ID: {$statusId}{$statusText}";
+        }
+
+        // Check if it's a success case but validation failed (missing required fields)
+        if ($statusId == 4 && isset($response['data_response']['transaction'])) {
+            return "PIX payment created but missing required fields for validation";
         }
 
         return 'Unknown error occurred';
@@ -720,9 +821,9 @@ class ProcessMultiPaymentQueue
             'response_keys' => array_keys($response),
             'has_error_flag' => isset($response['error']) ? $response['error'] : 'not_set',
             'status_id_locations' => [
-                'direct' => $response['status_id'] ?? 'not_found',
+                'data_response_transaction' => $response['data_response']['transaction']['status_id'] ?? 'not_found',
                 'transaction' => $response['transaction']['status_id'] ?? 'not_found',
-                'response_status_id' => $response['response']['status_id'] ?? 'not_found'
+                'direct' => $response['status_id'] ?? 'not_found'
             ]
         ];
 
@@ -730,18 +831,21 @@ class ProcessMultiPaymentQueue
         switch ($queueItem->getSecondaryMethodType()) {
             case MultiPaymentQueue::SECONDARY_METHOD_PIX:
                 $debugData['pix_indicators'] = [
-                    'pix_code' => !empty($response['pix_code']),
-                    'pix_url' => !empty($response['pix_url']),
-                    'pix_expiration_date' => !empty($response['pix_expiration_date'])
+                    'qrcode_original_path' => !empty($response['data_response']['transaction']['payment']['qrcode_original_path']),
+                    'url_payment' => !empty($response['data_response']['transaction']['payment']['url_payment']),
+                    'qrcode_path' => !empty($response['data_response']['transaction']['payment']['qrcode_path']),
+                    'fallback_pix_code' => !empty($response['pix_code']),
+                    'fallback_pix_url' => !empty($response['pix_url'])
                 ];
                 break;
                 
             case MultiPaymentQueue::SECONDARY_METHOD_BOLEPIX:
                 $debugData['bolepix_indicators'] = [
-                    'bankslip_url' => !empty($response['bankslip_url']),
-                    'bankslip_code' => !empty($response['bankslip_code']),
-                    'pix_code' => !empty($response['pix_code']),
-                    'pix_url' => !empty($response['pix_url'])
+                    'bankslip_url' => !empty($response['data_response']['transaction']['payment']['bankslip_url']),
+                    'qrcode_original_path' => !empty($response['data_response']['transaction']['payment']['qrcode_original_path']),
+                    'url_payment' => !empty($response['data_response']['transaction']['payment']['url_payment']),
+                    'fallback_bankslip_url' => !empty($response['bankslip_url']),
+                    'fallback_pix_code' => !empty($response['pix_code'])
                 ];
                 break;
         }

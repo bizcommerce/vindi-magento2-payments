@@ -845,4 +845,17 @@
             <argument name="resourceModel" xsi:type="string">Vindi\VP\Model\ResourceModel\CreditCard</argument>
         </arguments>
     </virtualType>
+
+    <!-- Cancellation Service Configuration -->
+    <type name="Vindi\VP\Gateway\Http\Client\Api">
+        <arguments>
+            <argument name="cancel" xsi:type="object">Vindi\VP\Gateway\Http\Client\Api\Cancel</argument>
+        </arguments>
+    </type>
+
+    <type name="Vindi\VP\Cron\ProcessCallbackQueue">
+        <arguments>
+            <argument name="cancellationService" xsi:type="object">Vindi\VP\Model\CancellationService</argument>
+        </arguments>
+    </type>
 </config>
