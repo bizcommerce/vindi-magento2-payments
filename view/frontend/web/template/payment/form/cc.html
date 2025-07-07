@@ -31,22 +31,25 @@
         <div data-bind="attr: {class: 'payment-method-content container-' + getCode()}">
             <form data-bind="attr: {id: 'form_' + getCode()}">
                 <fieldset data-bind="attr: {class: 'fieldset payment items ccard ' + getCode(), id: 'payment_form_' + getCode()}, visible: showCardData">
-                    <!-- ko if: (hasPaymentProfiles()) -->
+                    <!-- ko if: hasPaymentProfiles() -->
                     <div class="field number required">
-                        <label data-bind="attr: {for: getCode() + '_cc_payment_profile'}" class="label">
-                            <span><!-- ko i18n: 'Seus cartões salvos' --><!-- /ko --></span>
+                        <label class="label" data-bind="attr: {for: getCode() + '_cc_payment_profile'}">
+                            <span data-bind="i18n: 'Seus cartões salvos'"></span>
                         </label>
                         <div class="control">
-                            <select name="payment[payment_profile]"
-                                    class="input-text select"
-                                    data-bind="attr: {id: getCode() + '_cc_payment_profile'},
-                                               enable: isActive($parents),
-                                               options: getPaymentProfiles(),
-                                               optionsValue: 'value',
-                                               optionsText: 'text',
-                                               optionsCaption: $t('Novo Cartão'),
-                                               value: selectedPaymentProfile,
-                                               valueUpdate: 'change'">
+                            <select
+                                name="payment[payment_profile]"
+                                class="input-text select"
+                                data-bind="
+                                    attr: {id: getCode() + '_cc_payment_profile'},
+                                    enable: isActive($parents),
+                                    options: getPaymentProfiles(),
+                                    optionsValue: 'value',
+                                    optionsText: 'text',
+                                    optionsCaption: $t('Novo Cartão'),
+                                    value: selectedPaymentProfile,
+                                    valueUpdate: 'change'
+                                ">
                             </select>
                         </div>
                     </div>

@@ -274,13 +274,12 @@ define(
                 return customer.isLoggedIn();
             },
 
-            /**
-             * Map card type
-             * @param {string} type
-             * @returns {string}
-             */
+            getCardLabel: function(cardType, last4) {
+                return $t('%1 ending in %2').replace('%1', cardType).replace('%2', last4);
+            },
+
             mapCardType: function (type) {
-                var mapping = {
+                var cardTypeMap = {
                     'Mastercard': 'MC',
                     'Aura': 'AU',
                     'Visa': 'VI',
@@ -290,12 +289,9 @@ define(
                     'Hipercard': 'HC',
                     'Hiper': 'HI'
                 };
-                return mapping[type] ? mapping[type] : type;
+                return cardTypeMap[type] || type;
             },
 
-            /**
-             * Update installments values
-             */
             updateInstallmentsValues: function () {
                 var self = this;
                 self.installmentsDisabled(true);
@@ -343,11 +339,26 @@ define(
              * @returns {Array}
              */
             getPaymentProfiles: function () {
-                return this.paymentProfiles;
+                var paymentProfiles = [];
+                var savedCards = window.checkoutConfig &&
+                    window.checkoutConfig.payment &&
+                    window.checkoutConfig.payment[this.getCode()] &&
+                    window.checkoutConfig.payment[this.getCode()].saved_cards;
+
+                if (savedCards && Array.isArray(savedCards)) {
+                    savedCards.forEach(function (card) {
+                        paymentProfiles.push({
+                            'value': card.id,
+                            'text': card.card_type + ' xxxx-' + card.card_number,
+                            'card_type': card.card_type
+                        });
+                    });
+                }
+                return paymentProfiles;
             },
 
             hasPaymentProfiles: function () {
-                return this.paymentProfiles.length > 0;
+                return this.getPaymentProfiles().length > 0;
             },
 
             initializeMasks: function() {

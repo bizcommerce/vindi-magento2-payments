@@ -226,9 +226,9 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         // Get the base transaction request
         $transaction = $this->getTransaction($order, $amountCredit);
 
-        // Aplicar desconto e frete proporcionais ao cartão
+        // Aplicar desconto e frete proporcionais ao cartão - os campos já estão dentro de transaction
         $transaction['transaction']['price_discount'] = (string)$discount;
-        $transaction['transaction_shipping']['shipping_price'] = (string)$shipping;
+        $transaction['transaction']['shipping_price'] = (string)$shipping;
 
         // Add credit card payment data
         $paymentProfileId = $payment->getAdditionalInformation('payment_profile');
@@ -257,9 +257,9 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         // Get the base transaction request
         $transaction = $this->getTransaction($order, $amountPix);
 
-        // Aplicar desconto e frete proporcionais ao pix
+        // Aplicar desconto e frete proporcionais ao pix - os campos já estão dentro de transaction
         $transaction['transaction']['price_discount'] = (string)$discount;
-        $transaction['transaction_shipping']['shipping_price'] = (string)$shipping;
+        $transaction['transaction']['shipping_price'] = (string)$shipping;
 
         // Add PIX payment data
         $transaction['payment'] = [
@@ -313,7 +313,6 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         return [
             'card_token'         => $creditCardResource->getCardToken(),
             'payment_method_id'  => $this->helper->getMethodIdByName($methodName),
-            'card_cvv'           => $cvv,
             'split'              => (string)$installments
         ];
     }
@@ -354,7 +353,6 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
             'card_number'        => $ccNumber,
             'card_expdate_month' => $ccExpMonth,
             'card_expdate_year'  => $ccExpYear,
-            'card_cvv'           => $ccCid,
             'split'              => (string)($installments ?: 1)
         ];
 
@@ -424,14 +422,12 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
             'transaction' => [
                 'customer_ip' => $order->getRemoteIp() ?: '127.0.0.1',
                 'order_number' => $pixOrderNumber,
+                'shipping_type' => $order->getShippingDescription() ?: 'SEM_FRETE',
+                'shipping_price' => '0', // PIX portion shipping will be calculated proportionally
                 'price_discount' => '0', // PIX portion discount will be calculated proportionally
                 'price_additional' => '0',
                 'url_notification' => $this->helper->getPaymentsNotificationUrl($order),
                 'free' => 'MAGENTO_API_' . $this->helper->getModuleVersion()
-            ],
-            'transaction_shipping' => [
-                'type_shipping' => $order->getShippingDescription() ?: 'SEM_FRETE',
-                'shipping_price' => '0' // PIX portion shipping will be calculated proportionally
             ],
             'transaction_product' => $this->getPixItemsData($order, $amountPix),
             'payment' => [

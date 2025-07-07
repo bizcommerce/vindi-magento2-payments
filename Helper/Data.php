@@ -65,7 +65,7 @@ class Data extends \Magento\Payment\Helper\Data
 
     protected array $methodIds = [
         'MC' => '4',
-        'VI' => '3',
+        'VI' => '4',
         'ELO' => '16',
         'AE' => '5',
         'HC' => '20',
@@ -77,7 +77,7 @@ class Data extends \Magento\Payment\Helper\Data
 
     protected array $methodIdsByName = [
         'mastercard' => '4',
-        'visa' => '3',
+        'visa' => '4',
         'elo' => '16',
         'americanexpress' => '5',
         'amex' => '5',

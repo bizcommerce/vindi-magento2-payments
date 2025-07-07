@@ -120,7 +120,6 @@ class PaymentsRequest
             'finger_print'        => $order->getPayment()->getAdditionalInformation('finger_print'),
             'customer'            => $this->getCustomerData($order),
             'transaction'         => $this->getTransactionInfo($order, $amount),
-            'transaction_shipping'=> $this->getTransactionShipping($order, $amount),
             'transaction_product' => $this->getItemsData($order, $amount)
         ];
 
@@ -141,9 +140,13 @@ class PaymentsRequest
      */
     protected function getTransactionInfo(Order $order, float $orderAmount): array
     {
+        $shippingData = $this->getShippingData($order, $orderAmount);
+        
         return [
             'customer_ip'      => $order->getRemoteIp(),
             'order_number'     => $order->getIncrementId(),
+            'shipping_type'    => $shippingData['shipping_type'],
+            'shipping_price'   => $shippingData['shipping_price'],
             'price_discount'   => (string) $this->getDiscountAmount($order, $orderAmount),
             'price_additional' => (string) $this->getPriceAdditional($order, $orderAmount),
             'url_notification' => $this->helper->getPaymentsNotificationUrl($order),
@@ -158,7 +161,7 @@ class PaymentsRequest
      * @param float $transactionAmount
      * @return array
      */
-    protected function getTransactionShipping(Order $order, float $transactionAmount = null): array
+    protected function getShippingData(Order $order, float $transactionAmount = null): array
     {
         $shippingDescription = $order->getShippingDescription();
         $shippingType = $shippingDescription ? $shippingDescription : 'SEM_FRETE';
@@ -172,7 +175,7 @@ class PaymentsRequest
         }
 
         return [
-            'type_shipping' => $shippingType,
+            'shipping_type' => $shippingType,
             'shipping_price'=> (string) $shippingAmount
         ];
     }

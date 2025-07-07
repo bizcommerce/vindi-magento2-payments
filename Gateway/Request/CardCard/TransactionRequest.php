@@ -230,9 +230,9 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         // Get the base transaction request
         $transaction = $this->getTransaction($order, $amountCard1);
 
-        // Apply discount for the second card portion
+        // Apply discount for the second card portion - os campos já estão dentro de transaction
         $transaction['transaction']['price_discount'] = (string)$discount;
-        $transaction['transaction_shipping']['shipping_price'] = (string)$shipping;
+        $transaction['transaction']['shipping_price'] = (string)$shipping;
 
         // Add credit card payment data
         $paymentProfileId = $payment->getAdditionalInformation('payment_profile');
@@ -263,9 +263,9 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         // Get the base transaction request
         $transaction = $this->getTransaction($order, $amountCard2);
 
-        // Apply discount for the first card portion
+        // Apply discount for the first card portion - os campos já estão dentro de transaction
         $transaction['transaction']['price_discount'] = (string)$discount;
-        $transaction['transaction_shipping']['shipping_price'] = (string)$shipping;
+        $transaction['transaction']['shipping_price'] = (string)$shipping;
 
         // Add second credit card payment data
         $paymentProfileId2 = $payment->getAdditionalInformation('payment_profile_2');
@@ -321,7 +321,6 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         return [
             'card_token'         => $creditCardResource->getCardToken(),
             'payment_method_id'  => $this->helper->getMethodIdByName($methodName),
-            'card_cvv'           => $cvv,
             'split'              => (string)$installments
         ];
     }
@@ -366,7 +365,6 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         return [
             'card_token'         => $creditCardResource->getCardToken(),
             'payment_method_id'  => $this->helper->getMethodIdByName($methodName),
-            'card_cvv'           => $cvv,
             'split'              => (string)$installments
         ];
     }
@@ -407,7 +405,6 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
             'card_number'        => $ccNumber,
             'card_expdate_month' => $ccExpMonth,
             'card_expdate_year'  => $ccExpYear,
-            'card_cvv'           => $ccCid,
             'split'              => (string)($installments ?: 1)
         ];
 
@@ -454,7 +451,6 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
             'card_number'        => $ccNumber,
             'card_expdate_month' => $ccExpMonth,
             'card_expdate_year'  => $ccExpYear,
-            'card_cvv'           => $ccCid,
             'split'              => (string)($installments ?: 1)
         ];
 
