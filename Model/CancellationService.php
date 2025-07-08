@@ -93,8 +93,6 @@ class CancellationService
             $vindiTransactionId = $transaction['transaction_id'] ?? '';
             $statusId = $transaction['status_id'] ?? '';
 
-            file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Webhook data - Order Number: ' . $orderNumber . ', Vindi Transaction ID: ' . $vindiTransactionId . ', Status: ' . $statusId . PHP_EOL, FILE_APPEND);
-
             if (empty($orderNumber)) {
                 throw new CancellationException('Missing order_number in webhook data');
             }
@@ -177,71 +175,54 @@ class CancellationService
      */
     private function processMultiPaymentCancellation(string $orderIncrementId, array $transactionData): CancellationResult
     {
-        file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Processing multi-payment cancellation for order: ' . $orderIncrementId . PHP_EOL, FILE_APPEND);
         $this->logger->execute('Processing multi-payment cancellation for order: ' . $orderIncrementId, 'vindi-cancellation');
 
         $order = $this->helperOrder->loadOrder($orderIncrementId);
         if (!$order || !$order->getId()) {
-            file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Order not found: ' . $orderIncrementId . PHP_EOL, FILE_APPEND);
             throw new CancellationException("Order {$orderIncrementId} not found");
         }
 
         $currentTransactionId = $transactionData['transaction_id'] ?? null;
-        file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Current transaction ID to cancel: ' . $currentTransactionId . PHP_EOL, FILE_APPEND);
 
         $invoices = $order->getInvoiceCollection();
-        if (count($invoices) > 0) {
-            file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Found ' . count($invoices) . ' invoices. Cancelling order and invoices...' . PHP_EOL, FILE_APPEND);
-        } else {
-            file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] No invoices found. Will cancel order directly.' . PHP_EOL, FILE_APPEND);
-        }
 
         $results = [];
         $allSuccessful = true;
 
         if ($currentTransactionId) {
-            file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Cancelling current transaction: ' . $currentTransactionId . PHP_EOL, FILE_APPEND);
             $result = $this->cancelTransaction($currentTransactionId, null, (int)$order->getStoreId());
             $results[$currentTransactionId] = $result;
 
             if ($result->getStatus() !== self::CANCELLATION_SUCCESS) {
                 $allSuccessful = false;
-                file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Current transaction cancellation failed: ' . $currentTransactionId . PHP_EOL, FILE_APPEND);
             } else {
-                file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Current transaction cancelled successfully: ' . $currentTransactionId . PHP_EOL, FILE_APPEND);
                 $this->logger->execute('Transaction cancelled successfully: ' . $currentTransactionId, 'vindi-cancellation');
             }
         }
 
         $relatedTransactions = $this->findRelatedTransactions($order);
-        file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Found related transactions: ' . json_encode($relatedTransactions) . PHP_EOL, FILE_APPEND);
 
         foreach ($relatedTransactions as $txnId) {
             if ($txnId === $currentTransactionId) {
                 continue;
             }
             
-            file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Cancelling related transaction: ' . $txnId . PHP_EOL, FILE_APPEND);
             $result = $this->cancelTransaction($txnId, null, (int)$order->getStoreId());
             $results[$txnId] = $result;
 
             if ($result->getStatus() !== self::CANCELLATION_SUCCESS) {
                 $allSuccessful = false;
-                file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Related transaction cancellation failed: ' . $txnId . PHP_EOL, FILE_APPEND);
             } else {
-                file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Related transaction cancelled successfully: ' . $txnId . PHP_EOL, FILE_APPEND);
                 $this->logger->execute('Transaction cancelled successfully: ' . $txnId, 'vindi-cancellation');
             }
         }
 
-        file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Forcing Magento order cancellation.' . PHP_EOL, FILE_APPEND);
         $this->cancelMagentoOrder($order, 'Order cancellation due to payment denial');
 
         if ($allSuccessful) {
             $status = self::CANCELLATION_SUCCESS;
             $message = 'All related transactions cancelled successfully and order cancelled';
         } else {
-            file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Some transactions failed to cancel. Status: PARTIAL' . PHP_EOL, FILE_APPEND);
             $status = self::CANCELLATION_PARTIAL;
             $message = 'Order cancelled in Magento, but some Vindi transactions could not be cancelled';
         }
@@ -266,7 +247,6 @@ class CancellationService
         }
 
         $vindiTransactionId = $transactionData['transaction_id'] ?? null;
-        file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Single payment - Order: ' . $orderNumber . ', Vindi Transaction ID: ' . $vindiTransactionId . PHP_EOL, FILE_APPEND);
 
         if (!$vindiTransactionId) {
             throw new CancellationException("Missing transaction_id in webhook data for order {$orderNumber}");
@@ -321,17 +301,13 @@ class CancellationService
     private function cancelMagentoOrder(Order $order, string $reason): void
     {
         try {
-            file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Attempting to cancel order ' . $order->getIncrementId() . ' - Can cancel: ' . ($order->canCancel() ? 'YES' : 'NO') . PHP_EOL, FILE_APPEND);
-
             $this->helperOrder->cancelOrder($order, (float)$order->getGrandTotal(), true);
             $order->addCommentToStatusHistory("Order cancelled: {$reason}");
             $order->save();
 
-            file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Order cancelled successfully in Magento.' . PHP_EOL, FILE_APPEND);
             $this->logger->execute('Order cancelled in Magento - Order ID: ' . $order->getIncrementId() . ', Reason: ' . $reason, 'vindi-cancellation');
 
         } catch (\Exception $e) {
-            file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Failed to cancel order: ' . $e->getMessage() . PHP_EOL, FILE_APPEND);
             $this->logger->execute('Failed to cancel order in Magento - Order ID: ' . $order->getIncrementId() . ', Error: ' . $e->getMessage(), 'vindi-cancellation');
 
             try {
@@ -339,9 +315,7 @@ class CancellationService
                 $order->setStatus('canceled');
                 $order->addCommentToStatusHistory("Order force cancelled: {$reason} (direct status change)");
                 $order->save();
-                file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Order force cancelled via direct status change.' . PHP_EOL, FILE_APPEND);
             } catch (\Exception $e2) {
-                file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Failed to force cancel order: ' . $e2->getMessage() . PHP_EOL, FILE_APPEND);
             }
         }
     }
