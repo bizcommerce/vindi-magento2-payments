@@ -206,7 +206,6 @@ class ConfigProvider extends CcGenericConfigProvider
      */
     public function getCcAvailableTypes($methodCode = null)
     {
-        // Força o uso das mesmas bandeiras do método vindi_vp_cc
         $ccConfigProvider = \Magento\Framework\App\ObjectManager::getInstance()->get(\Vindi\VP\Model\Ui\CreditCard\ConfigProvider::class);
         return $ccConfigProvider->getCcAvailableTypes('vindi_vp_cc');
     }

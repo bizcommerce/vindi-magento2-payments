@@ -82,34 +82,27 @@ class TransactionHandler implements HandlerInterface
         $payment = $paymentDO->getPayment();
         $order = $payment->getOrder();
 
-        // Log para debug
         $this->helper->log(
             "CardPix TransactionHandler - Processing order {$order->getIncrementId()}",
             'cardpix_handler'
         );
 
-        // Process Card response (primary transaction)
         if (isset($response['transaction'])) {
             $cardTransaction = $response['transaction'];
             $cardTid = $cardTransaction['payment']['tid'] ?? '';
             $cardStatus = $cardTransaction['status_id'] ?? '';
 
-            // Store card payment information
             $payment->setAdditionalInformation('card_payment_tid', $cardTid);
             $payment->setAdditionalInformation('card_status', $cardStatus);
             $payment->setAdditionalInformation('card_installments', $payment->getAdditionalInformation('installments'));
             $payment->setAdditionalInformation('card_amount', $payment->getAdditionalInformation('amount_credit'));
 
-            // Set the transaction ID for the card portion
             $payment->setTransactionId($cardTid);
             $payment->setIsTransactionClosed(false);
 
-            // Check if card payment was successful
             if ($this->isSuccessfulResponse($cardTransaction)) {
-                // Card payment success - update existing PIX queue record with card TID and keep pending status
                 $this->updatePixQueueRecord($order, $cardTid, MultiPaymentQueue::STATUS_PENDING);
                 
-                // Set payment status
                 $payment->setAdditionalInformation('payment_status', 'card_approved_pix_pending');
                 
                 $this->helper->log(
@@ -117,10 +110,8 @@ class TransactionHandler implements HandlerInterface
                     'cardpix_handler'
                 );
             } else {
-                // Card payment failed - update existing PIX queue record to failed status (cancelled due to card failure)
                 $this->updatePixQueueRecord($order, $cardTid, MultiPaymentQueue::STATUS_FAILED);
                 
-                // Set payment status
                 $payment->setAdditionalInformation('payment_status', 'card_failed_pix_cancelled');
                 
                 $this->helper->log(
@@ -128,13 +119,11 @@ class TransactionHandler implements HandlerInterface
                     'cardpix_handler'
                 );
                 
-                // Mark payment as failed but don't throw exception to allow order processing
                 $payment->setIsTransactionPending(false);
                 $payment->setIsTransactionClosed(true);
             }
         }
 
-        // Store the complete response data as additional information
         $payment->setAdditionalInformation('vindi_response', $this->serializer->serialize($response));
     }
 
@@ -149,7 +138,6 @@ class TransactionHandler implements HandlerInterface
     private function updatePixQueueRecord($order, string $cardTid, string $status): void
     {
         try {
-            // Find the existing PIX queue record for this order
             $queueItems = $this->multiPaymentQueueService->getByOrderId((int)$order->getId());
             
             $pixQueueFound = false;
@@ -157,16 +145,13 @@ class TransactionHandler implements HandlerInterface
                 if ($queueItem->getSecondaryMethodType() === MultiPaymentQueue::SECONDARY_METHOD_PIX) {
                     $pixQueueFound = true;
                     
-                    // Update the queue record with card TID and status
                     $queueItem->setPrimaryTransactionId($cardTid);
                     
-                    // Add error message if status is failed
                     $errorMessage = null;
                     if ($status === MultiPaymentQueue::STATUS_FAILED) {
                         $errorMessage = 'PIX cancelled due to card payment failure';
                     }
                     
-                    // Use the updateStatus method to save
                     $this->multiPaymentQueueService->updateStatus($queueItem, $status, [], $errorMessage);
                     
                     $this->helper->log(
@@ -200,11 +185,9 @@ class TransactionHandler implements HandlerInterface
      */
     private function isSuccessfulResponse(array $response): bool
     {
-        // Check if we have a successful card transaction
         $statusId = $response['status_id'] ?? null;
         $tid = $response['payment']['tid'] ?? null;
         
-        // Status 3 = Authorized, Status 4 = Captured - both are successful for cards
         return !empty($tid) && in_array($statusId, ['3', '4']);
     }
 }

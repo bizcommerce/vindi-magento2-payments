@@ -137,25 +137,20 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         $payment = $buildSubject['payment']->getPayment();
         $order = $payment->getOrder();
 
-        // Valores de split vindos do frontend - apenas dois valores
         $amountCredit = (float)($payment->getAdditionalInformation('amount_credit') ?? 0);
         $amountBolepix = (float)($payment->getAdditionalInformation('amount_bolepix') ?? 0);
 
-        // Se não vierem valores, dividir igualmente como fallback
         if ($amountCredit <= 0 && $amountBolepix <= 0) {
             $grandTotal = (float)$order->getGrandTotal();
             $amountCredit = round($grandTotal / 2, 2);
-            $amountBolepix = $grandTotal - $amountCredit; // Resto para evitar diferenças de centavos
+            $amountBolepix = $grandTotal - $amountCredit;
         }
 
-        // Log para debug dos valores
         $this->logger->info('CardBankSlipPix Transaction Build - Order: ' . $order->getIncrementId() .
             ', Card: ' . $amountCredit . ', Bolepix: ' . $amountBolepix);
 
-        // Construir apenas a requisição do cartão (primeira transação)
         $cardRequest = $this->buildPrimaryCardRequest($order, $payment, $amountCredit);
 
-        // Salvar dados temporariamente no payment para serem processados após o salvamento da order
         $this->queueBolepixPayment($order, $payment, $amountBolepix);
 
         return [
@@ -227,7 +222,6 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         }
         $cvv = $payment->getAdditionalInformation('cc_cid') ?: $payment->getCcCid();
 
-        // CVV é sempre obrigatório para todos os cartões
         if (!$cvv || trim($cvv) === '') {
             throw new LocalizedException(__('CVV is required for all cards.'));
         }
@@ -289,17 +283,13 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
      */
     private function buildPrimaryCardRequest($order, $payment, float $amountCredit): array
     {
-        // Get the base transaction request for the card amount only
         $transaction = $this->getTransaction($order, $amountCredit);
 
-        // Override order_number with increment_id-01 format for card payment
         $orderNumber = $order->getIncrementId() . '-01';
         $transaction['transaction']['order_number'] = $orderNumber;
 
-        // Log para confirmar o order_number
         $this->logger->info('CardBankSlipPix Primary Transaction - Order Number: ' . $orderNumber . ', Amount: ' . $amountCredit);
 
-        // Add credit card payment data
         $paymentProfileId = $payment->getAdditionalInformation('payment_profile');
         if ($paymentProfileId) {
             $transaction['payment'] = $this->getSavedCardData((string)$paymentProfileId, $payment);
@@ -324,10 +314,8 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
             return;
         }
 
-        // Build Bolepix request data
         $bolepixRequestData = $this->buildBolepixRequestData($order, $payment, $amountBolepix);
 
-        // Prepare queue data for the event
         $queueData = [
             'increment_id' => (string)$order->getIncrementId(),
             'payment_method' => 'vindi_vp_cardbankslippix',
@@ -337,7 +325,6 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
             'status' => MultiPaymentQueue::STATUS_PENDING
         ];
 
-        // Dispatch custom event to process multi-payment queue immediately
         $this->eventManager->dispatch('vindi_vp_process_multi_payment_queue', [
             'order' => $order,
             'queue_data' => $queueData
@@ -359,15 +346,12 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
      */
     private function buildBolepixRequestData($order, $payment, float $amountBolepix): array
     {
-        // Get the base transaction request for the Bolepix amount
         $transaction = $this->getTransaction($order, $amountBolepix);
 
-        // Override order_number with increment_id-02 format for Bolepix payment
         $transaction['transaction']['order_number'] = $order->getIncrementId() . '-02';
 
-        // Set Bolepix payment method (combines bankslip and pix functionality)
         $transaction['payment'] = [
-            'payment_method_id' => $this->helper->getMethodId('BANK_SLIP'), // Use BANK_SLIP as base method for Bolepix
+            'payment_method_id' => $this->helper->getMethodId('BANK_SLIP'),
             'split' => 1
         ];
 

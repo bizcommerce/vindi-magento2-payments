@@ -140,7 +140,6 @@ class ProcessMultiPaymentQueue
                 'attempt' => $queueItem->getAttempts() + 1
             ]);
 
-            // Log para debug no vindi.log
             $this->vindiLogger->execute('Starting multi-payment queue item processing', 'multi-payment-queue');
             $this->vindiLogger->execute([
                 'queue_item_id' => $queueItem->getId(),
@@ -152,21 +151,16 @@ class ProcessMultiPaymentQueue
                 'max_attempts' => $queueItem->getMaxAttempts()
             ], 'multi-payment-queue');
 
-            // Mark as processing
             $this->queueService->markAsProcessing($queueItem);
 
-            // Process based on secondary method type
             $response = $this->processSecondaryPayment($queueItem);
 
-            // Debug: Response received
             $this->debugQueueProcessing($queueItem, $response, 'response_received');
 
-            // Log response detalhado
             $this->vindiLogger->execute('Multi-payment API response received', 'multi-payment-queue');
             $this->vindiLogger->execute($response, 'multi-payment-queue');
 
             if ($this->isSuccessfulResponse($response, $queueItem->getSecondaryMethodType())) {
-                // Debug: Success detected
                 $this->debugQueueProcessing($queueItem, $response, 'success_detected');
                 $this->queueService->updateStatus(
                     $queueItem,
@@ -180,7 +174,6 @@ class ProcessMultiPaymentQueue
                     'status' => 'executed'
                 ]);
 
-                // Log sucesso no vindi.log
                 $this->vindiLogger->execute('Multi-payment queue item processed successfully', 'multi-payment-queue');
                 $this->vindiLogger->execute([
                     'queue_item_id' => $queueItem->getId(),
@@ -188,11 +181,9 @@ class ProcessMultiPaymentQueue
                     'response_summary' => $this->getResponseSummary($response, $queueItem->getSecondaryMethodType())
                 ], 'multi-payment-queue');
 
-                // Handle successful payment specific logic
                 $this->handleSuccessfulPayment($queueItem, $response);
 
             } else {
-                // Debug: Failure detected
                 $this->debugQueueProcessing($queueItem, $response, 'failure_detected');
                 
                 $errorMessage = $this->extractErrorMessage($response);
@@ -212,7 +203,6 @@ class ProcessMultiPaymentQueue
                         'max_attempts' => $queueItem->getMaxAttempts()
                     ]);
 
-                    // Log retry no vindi.log
                     $this->vindiLogger->execute('Multi-payment queue item failed, will retry', 'multi-payment-queue');
                     $this->vindiLogger->execute([
                         'queue_item_id' => $queueItem->getId(),
@@ -234,7 +224,6 @@ class ProcessMultiPaymentQueue
                         'error' => $errorMessage
                     ]);
 
-                    // Log falha permanente no vindi.log
                     $this->vindiLogger->execute('Multi-payment queue item failed permanently', 'multi-payment-queue');
                     $this->vindiLogger->execute([
                         'queue_item_id' => $queueItem->getId(),
@@ -248,7 +237,6 @@ class ProcessMultiPaymentQueue
         } catch (\Exception $e) {
             $errorMessage = 'Exception during processing: ' . $e->getMessage();
             
-            // Log exception no vindi.log
             $this->vindiLogger->execute('Exception during multi-payment queue processing', 'multi-payment-queue');
             $this->vindiLogger->execute([
                 'queue_item_id' => $queueItem->getId(),
@@ -291,10 +279,8 @@ class ProcessMultiPaymentQueue
         $requestData = $queueItem->getRequestData();
         
         try {
-            // Log request usando o sistema padrão da API (para vindi.log e BD)
             $this->api->logRequest($requestData, 'multi-payment-cron');
             
-            // Log request detalhado no vindi.log
             $this->vindiLogger->execute('Sending multi-payment API request', 'multi-payment-queue');
             $this->vindiLogger->execute([
                 'queue_item_id' => $queueItem->getId(),
@@ -302,13 +288,10 @@ class ProcessMultiPaymentQueue
                 'request_data' => $requestData
             ], 'multi-payment-queue');
 
-            // Use the existing API Create client
             $apiResponse = $this->apiCreate->execute($requestData);
             
-            // Log response usando o sistema padrão da API (para vindi.log e BD)
             $this->api->logResponse($apiResponse, 'multi-payment-cron');
             
-            // Salvar request/response no BD como as transações normais
             $statusCode = $apiResponse['status'] ?? 200;
             $responseData = $apiResponse['response'] ?? $apiResponse;
             $this->api->saveRequest(
@@ -324,7 +307,6 @@ class ProcessMultiPaymentQueue
                 'response' => $apiResponse
             ]);
 
-            // Log response detalhado no vindi.log  
             $this->vindiLogger->execute('Multi-payment API response', 'multi-payment-queue');
             $this->vindiLogger->execute([
                 'queue_item_id' => $queueItem->getId(),
@@ -340,7 +322,6 @@ class ProcessMultiPaymentQueue
                 'error' => $e->getMessage()
             ]);
 
-            // Log error no vindi.log
             $this->vindiLogger->execute('Error in multi-payment API request', 'multi-payment-queue');
             $this->vindiLogger->execute([
                 'queue_item_id' => $queueItem->getId(),
@@ -349,7 +330,6 @@ class ProcessMultiPaymentQueue
                 'request_data' => $requestData
             ], 'multi-payment-queue');
 
-            // Salvar erro no BD também
             $this->api->saveRequest(
                 $requestData, 
                 ['error' => true, 'message' => $e->getMessage()], 
@@ -370,12 +350,10 @@ class ProcessMultiPaymentQueue
      */
     private function handleSuccessfulPayment(MultiPaymentQueue $queueItem, array $response): void
     {
-        // For PIX payments, create payment link if needed
         if ($queueItem->getSecondaryMethodType() === MultiPaymentQueue::SECONDARY_METHOD_PIX) {
             $this->handleSuccessfulPixPayment($queueItem, $response);
         }
         
-        // For Bolepix payments, handle both bankslip and PIX data
         if ($queueItem->getSecondaryMethodType() === MultiPaymentQueue::SECONDARY_METHOD_BOLEPIX) {
             $this->handleSuccessfulBolepixPayment($queueItem, $response);
         }
@@ -390,7 +368,6 @@ class ProcessMultiPaymentQueue
      */
     private function handleSuccessfulBolepixPayment(MultiPaymentQueue $queueItem, array $response): void
     {
-        // Extract Bolepix data (bankslip + PIX combined)
         $bankSlipUrl = $response['bankslip_url'] ?? '';
         $bankSlipCode = $response['bankslip_code'] ?? '';
         $pixCode = $response['pix_code'] ?? '';
@@ -405,8 +382,6 @@ class ProcessMultiPaymentQueue
             'has_pix' => !empty($pixCode)
         ]);
 
-        // Here you could create payment links or update order information as needed
-        // The response should contain both bankslip and PIX payment options
     }
 
     /**
@@ -418,16 +393,14 @@ class ProcessMultiPaymentQueue
      */
     private function handleSuccessfulPixPayment(MultiPaymentQueue $queueItem, array $response): void
     {
-        // Extract PIX data and create payment link if needed
         $pixCode = $response['pix_code'] ?? '';
         $pixUrl = $response['pix_url'] ?? '';
         $pixExpiration = $response['pix_expiration_date'] ?? '';
 
         if ($pixCode && $pixUrl) {
-            // Here you could create a payment link or update order information
             $this->logger->info('PIX payment created successfully', [
                 'queue_item_id' => $queueItem->getId(),
-                'pix_code' => substr($pixCode, 0, 20) . '...', // Log partial code for security
+                'pix_code' => substr($pixCode, 0, 20) . '...',
                 'pix_url' => $pixUrl
             ]);
         }
@@ -442,7 +415,6 @@ class ProcessMultiPaymentQueue
      */
     private function isSuccessfulResponse(array $response, string $secondaryMethodType): bool
     {
-        // Log para debug da verificação
         $this->vindiLogger->execute('Checking response success', 'multi-payment-queue');
         $this->vindiLogger->execute([
             'secondary_method' => $secondaryMethodType,
@@ -452,13 +424,11 @@ class ProcessMultiPaymentQueue
             'payment_keys' => isset($response['data_response']['transaction']['payment']) ? array_keys($response['data_response']['transaction']['payment']) : 'not_found'
         ], 'multi-payment-queue');
 
-        // Check for explicit error
         if (isset($response['error']) && $response['error']) {
             $this->vindiLogger->execute('Response contains explicit error flag', 'multi-payment-queue');
             return false;
         }
 
-        // Check success based on payment method type
         switch ($secondaryMethodType) {
             case MultiPaymentQueue::SECONDARY_METHOD_PIX:
                 return $this->isPixResponseSuccessful($response);
@@ -474,11 +444,10 @@ class ProcessMultiPaymentQueue
                 return $this->isBankslipResponseSuccessful($response);
                 
             default:
-                // Fallback to original logic with updated status locations
                 $statusId = $response['data_response']['transaction']['status_id'] ?? 
                            $response['transaction']['status_id'] ?? 
                            $response['status_id'] ?? null;
-                $isSuccess = in_array($statusId, [1, 4, 6, 11]); // Added status 4 for "Aguardando Pagamento"
+                $isSuccess = in_array($statusId, [1, 4, 6, 11]);
                 
                 $this->vindiLogger->execute('Using fallback status verification', 'multi-payment-queue');
                 $this->vindiLogger->execute([
@@ -498,7 +467,6 @@ class ProcessMultiPaymentQueue
      */
     private function isPixResponseSuccessful(array $response): bool
     {
-        // Check for PIX data in the actual API structure
         $pixCode = $response['data_response']['transaction']['payment']['qrcode_original_path'] ?? 
                    $response['qrcode_original_path'] ?? 
                    $response['pix_code'] ?? null;
@@ -514,15 +482,12 @@ class ProcessMultiPaymentQueue
         $hasPixUrl = !empty($pixUrl);
         $hasQrCode = !empty($qrCodePath);
         
-        // For PIX, having either qrcode_original_path OR url_payment is sufficient
         $hasPixData = $hasPixCode || $hasPixUrl || $hasQrCode;
         
-        // Check status in the actual API structure - PIX aguardando pagamento (status 4) é válido
         $statusId = $response['data_response']['transaction']['status_id'] ?? 
                    $response['transaction']['status_id'] ?? 
                    $response['status_id'] ?? null;
         
-        // PIX valid statuses: 1=captured, 4=aguardando_pagamento, 6=authorized, 11=pending_capture
         $hasValidStatus = in_array($statusId, [1, 4, 6, 11]);
         
         $isSuccess = $hasPixData && $hasValidStatus;
@@ -552,7 +517,6 @@ class ProcessMultiPaymentQueue
      */
     private function isBolepixResponseSuccessful(array $response): bool
     {
-        // Check for Bolepix data in the actual API structure
         $bankslipUrl = $response['data_response']['transaction']['payment']['bankslip_url'] ?? 
                       $response['bankslip_url'] ?? null;
                       
@@ -568,15 +532,12 @@ class ProcessMultiPaymentQueue
         $hasPixCode = !empty($pixCode);
         $hasPixUrl = !empty($pixUrl);
         
-        // Check status in the actual API structure
         $statusId = $response['data_response']['transaction']['status_id'] ?? 
                    $response['transaction']['status_id'] ?? 
                    $response['status_id'] ?? null;
         
-        // Bolepix valid statuses: 1=captured, 4=aguardando_pagamento, 6=authorized, 11=pending_capture
         $hasValidStatus = in_array($statusId, [1, 4, 6, 11]);
         
-        // For Bolepix, we need either bankslip URL or PIX data (or both)
         $isSuccess = ($hasBankslipUrl || $hasPixCode || $hasPixUrl) && $hasValidStatus;
         
         $this->vindiLogger->execute('Bolepix response validation', 'multi-payment-queue');
@@ -600,12 +561,10 @@ class ProcessMultiPaymentQueue
      */
     private function isCardResponseSuccessful(array $response): bool
     {
-        // Check status in the actual API structure
         $statusId = $response['data_response']['transaction']['status_id'] ?? 
                    $response['transaction']['status_id'] ?? 
                    $response['status_id'] ?? null;
                    
-        // Check transaction ID in various possible locations
         $transactionId = $response['data_response']['transaction']['transaction_id'] ?? 
                         $response['transaction_id'] ?? 
                         $response['tid'] ?? 
@@ -613,7 +572,6 @@ class ProcessMultiPaymentQueue
         
         $hasTransactionId = !empty($transactionId);
         
-        // Card valid statuses: 1=captured, 6=authorized, 11=pending_capture
         $isSuccess = in_array($statusId, [1, 6, 11]) && $hasTransactionId;
         
         $this->vindiLogger->execute('Card response validation', 'multi-payment-queue');
@@ -635,7 +593,6 @@ class ProcessMultiPaymentQueue
      */
     private function isBankslipResponseSuccessful(array $response): bool
     {
-        // Check for Bankslip data in the actual API structure
         $bankslipUrl = $response['data_response']['transaction']['payment']['bankslip_url'] ?? 
                       $response['bankslip_url'] ?? null;
                       
@@ -646,12 +603,10 @@ class ProcessMultiPaymentQueue
         $hasBankslipUrl = !empty($bankslipUrl);
         $hasBankslipCode = !empty($bankslipCode);
         
-        // Check status in the actual API structure
         $statusId = $response['data_response']['transaction']['status_id'] ?? 
                    $response['transaction']['status_id'] ?? 
                    $response['status_id'] ?? null;
         
-        // Bankslip valid statuses: 1=captured, 4=aguardando_pagamento, 6=authorized, 11=pending_capture
         $hasValidStatus = in_array($statusId, [1, 4, 6, 11]);
         
         $isSuccess = $hasBankslipUrl && $hasValidStatus;
@@ -742,7 +697,6 @@ class ProcessMultiPaymentQueue
      */
     private function extractErrorMessage(array $response): string
     {
-        // Check various possible error message locations including new API structure
         $errorSources = [
             'message',
             'error_message', 
@@ -758,7 +712,6 @@ class ProcessMultiPaymentQueue
 
         foreach ($errorSources as $source) {
             if (strpos($source, '.') !== false) {
-                // Handle nested properties like 'data_response.error_message'
                 $parts = explode('.', $source);
                 $value = $response;
                 foreach ($parts as $part) {
@@ -780,7 +733,6 @@ class ProcessMultiPaymentQueue
             }
         }
 
-        // If no specific error message found, try to extract from status in new structure
         $statusId = $response['data_response']['transaction']['status_id'] ?? 
                    $response['transaction']['status_id'] ?? 
                    $response['status_id'] ?? null;
@@ -792,7 +744,6 @@ class ProcessMultiPaymentQueue
             return "Payment failed with status ID: {$statusId}{$statusText}";
         }
 
-        // Check if it's a success case but validation failed (missing required fields)
         if ($statusId == 4 && isset($response['data_response']['transaction'])) {
             return "PIX payment created but missing required fields for validation";
         }
@@ -827,7 +778,6 @@ class ProcessMultiPaymentQueue
             ]
         ];
 
-        // Específico por tipo de método
         switch ($queueItem->getSecondaryMethodType()) {
             case MultiPaymentQueue::SECONDARY_METHOD_PIX:
                 $debugData['pix_indicators'] = [

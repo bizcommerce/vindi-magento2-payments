@@ -180,7 +180,6 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
 
         $cvv = $payment->getCcCid() ?: $payment->getAdditionalInformation('cc_cid');
         
-        // CVV é sempre obrigatório para todos os cartões
         if (!$cvv || trim($cvv) === '') {
             throw new LocalizedException(__('CVV is required for all cards.'));
         }

@@ -149,17 +149,14 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
 
             $this->logger->info('[CardCard TransactionRequest] Order ID: ' . $order->getIncrementId());
             
-            // Log todas as informações adicionais do pagamento
             $additionalInfo = $payment->getAdditionalInformation();
             $this->logger->info('[CardCard TransactionRequest] Additional Information: ' . json_encode($additionalInfo));
 
-            // Valores de split vindos do frontend
             $amountCard1 = (float)($payment->getAdditionalInformation('amount_card1') ?? 0);
             $amountCard2 = (float)($payment->getAdditionalInformation('amount_card2') ?? 0);
 
             $this->logger->info('[CardCard TransactionRequest] Valores do frontend - Card1: ' . $amountCard1 . ', Card2: ' . $amountCard2);
 
-            // Se não vierem valores, dividir meio a meio como fallback
             if ($amountCard1 <= 0 && $amountCard2 <= 0) {
                 $grandTotal = (float)$order->getGrandTotal();
                 $amountCard1 = round($grandTotal / 2, 2);
@@ -168,7 +165,6 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
                 $this->logger->info('[CardCard TransactionRequest] Usando fallback - Card1: ' . $amountCard1 . ', Card2: ' . $amountCard2);
             }
 
-            // Log para debug dos valores
             $this->logger->info('CardCard Transaction Build - Order: ' . $order->getIncrementId() .
                          ', Total: ' . $order->getGrandTotal() .
                          ', Subtotal: ' . $order->getBaseSubtotal() .
@@ -177,14 +173,11 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
                          ', Card1: ' . $amountCard1 .
                          ', Card2: ' . $amountCard2);
 
-            // Construir apenas a requisição do primeiro cartão (primeira transação)
             $this->logger->info('[CardCard TransactionRequest] Construindo requisição do primeiro cartão');
             $card1Request = $this->buildPrimaryCard1Request($order, $payment, $amountCard1);
 
-            // Log the card1Request to verify it's not empty
             $this->logger->info('[CardCard TransactionRequest] Card1 Request Data: ' . json_encode($card1Request));
 
-            // Salvar o registro do segundo cartão na queue logo após criar a requisição do primeiro cartão
             $this->logger->info('[CardCard TransactionRequest] Adicionando segundo cartão à fila');
             $this->queueCard2Payment($order, $payment, $amountCard2);
 
@@ -192,12 +185,11 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
                 'request' => $card1Request,
                 'client_config' => [
                     'store_id' => (int)$order->getStoreId(),
-                    'amount_card2' => $amountCard2, // Para ser usado no response handler
+                    'amount_card2' => $amountCard2,
                     'increment_id' => $order->getIncrementId()
                 ]
             ];
 
-            // Log the final result to verify structure
             $this->logger->info('[CardCard TransactionRequest] Final Result Structure: ' . json_encode([
                 'has_request_key' => isset($result['request']),
                 'has_client_config_key' => isset($result['client_config']),
@@ -227,14 +219,11 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
      */
     private function buildCard1Request($order, $payment, float $amountCard1, float $shipping, float $discount): array
     {
-        // Get the base transaction request
         $transaction = $this->getTransaction($order, $amountCard1);
 
-        // Apply discount for the second card portion - os campos já estão dentro de transaction
         $transaction['transaction']['price_discount'] = (string)$discount;
         $transaction['transaction']['shipping_price'] = (string)$shipping;
 
-        // Add credit card payment data
         $paymentProfileId = $payment->getAdditionalInformation('payment_profile');
         if ($paymentProfileId) {
             $transaction['payment'] = $this->getSavedCardData((string)$paymentProfileId, $payment);
@@ -242,7 +231,6 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
             $transaction['payment'] = $this->getNewCardData($payment);
         }
 
-        // Set specific information in transaction for the first card
         $transaction['transaction']['order_number'] = $order->getIncrementId() . '-CARD1';
 
         return $transaction;
@@ -260,14 +248,11 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
      */
     private function buildCard2Request($order, $payment, float $amountCard2, float $shipping, float $discount): array
     {
-        // Get the base transaction request
         $transaction = $this->getTransaction($order, $amountCard2);
 
-        // Apply discount for the first card portion - os campos já estão dentro de transaction
         $transaction['transaction']['price_discount'] = (string)$discount;
         $transaction['transaction']['shipping_price'] = (string)$shipping;
 
-        // Add second credit card payment data
         $paymentProfileId2 = $payment->getAdditionalInformation('payment_profile_2');
         if ($paymentProfileId2) {
             $transaction['payment'] = $this->getSavedSecondCardData((string)$paymentProfileId2, $payment);
@@ -275,7 +260,6 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
             $transaction['payment'] = $this->getNewSecondCardData($payment);
         }
 
-        // Set specific information in transaction for the second card
         $transaction['transaction']['order_number'] = $order->getIncrementId() . '-CARD2';
 
         return $transaction;
@@ -309,7 +293,6 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
 
         $cvv = $payment->getAdditionalInformation('cc_cid') ?: $payment->getCcCid();
 
-        // CVV é sempre obrigatório para todos os cartões
         if (!$cvv || trim($cvv) === '') {
             throw new LocalizedException(__('CVV is required for all cards.'));
         }
@@ -353,7 +336,6 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
 
         $cvv = $payment->getAdditionalInformation('cc_cid_2') ?: '';
 
-        // CVV é sempre obrigatório para todos os cartões
         if (!$cvv || trim($cvv) === '') {
             throw new LocalizedException(__('CVV is required for second card.'));
         }
@@ -473,19 +455,15 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
     {
         $this->logger->info('[CardCard] Iniciando buildPrimaryCard1Request com amount: ' . $amountCard1);
         
-        // Get the base transaction request for the card1 amount only
         $transaction = $this->getTransaction($order, $amountCard1);
         
         $this->logger->info('[CardCard] Transaction base criada: ' . json_encode(array_keys($transaction)));
 
-        // Override order_number with increment_id-01 format for card1 payment
         $orderNumber = $order->getIncrementId() . '-01';
         $transaction['transaction']['order_number'] = $orderNumber;
 
-        // Log para confirmar o order_number
         $this->logger->info('CardCard Primary Transaction - Order Number: ' . $orderNumber . ', Amount: ' . $amountCard1);
 
-        // Add credit card payment data
         $paymentProfileId = $payment->getAdditionalInformation('payment_profile');
         if ($paymentProfileId) {
             $this->logger->info('[CardCard] Usando cartão salvo: ' . $paymentProfileId);
@@ -495,7 +473,6 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
             $transaction['payment'] = $this->getNewCardData($payment);
         }
         
-        // Log final structure without sensitive data
         $logTransaction = $transaction;
         if (isset($logTransaction['payment']['card_number'])) {
             $logTransaction['payment']['card_number'] = '****';
@@ -520,13 +497,11 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
     private function queueCard2Payment($order, $payment, float $amountCard2): void
     {
         if ($amountCard2 <= 0) {
-            return; // No Card2 amount to process
+            return;
         }
 
-        // Build Card2 request data
         $card2RequestData = $this->buildCard2RequestData($order, $payment, $amountCard2);
 
-        // Prepare queue data for the event
         $queueData = [
             'increment_id' => (string)$order->getIncrementId(),
             'payment_method' => 'vindi_vp_cardcard',
@@ -536,7 +511,6 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
             'status' => MultiPaymentQueue::STATUS_PENDING
         ];
 
-        // Dispatch custom event to process multi-payment queue immediately
         $this->eventManager->dispatch('vindi_vp_process_multi_payment_queue', [
             'order' => $order,
             'queue_data' => $queueData
@@ -558,13 +532,10 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
      */
     private function buildCard2RequestData($order, $payment, float $amountCard2): array
     {
-        // Get the base transaction request for the Card2 amount
         $transaction = $this->getTransaction($order, $amountCard2);
 
-        // Override order_number with increment_id-02 format for Card2 payment
         $transaction['transaction']['order_number'] = $order->getIncrementId() . '-02';
 
-        // Add second credit card payment data
         $paymentProfileId2 = $payment->getAdditionalInformation('payment_profile_2');
         if ($paymentProfileId2) {
             $transaction['payment'] = $this->getSavedSecondCardData((string)$paymentProfileId2, $payment);

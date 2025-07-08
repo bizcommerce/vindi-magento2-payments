@@ -49,7 +49,6 @@ class CardBankSlipPixValidator extends AbstractValidator
             return $this->createResult(false, $errorMessages);
         }
 
-        // Validate the bank slip response
         $bankSlipValid = $this->validateBankSlipResponse($response['bankslip_response'] ?? []);
         if (!$bankSlipValid['isValid']) {
             return $this->createResult(
@@ -58,7 +57,6 @@ class CardBankSlipPixValidator extends AbstractValidator
             );
         }
 
-        // Validate the PIX response
         $pixValid = $this->validatePixResponse($response['pix_response'] ?? []);
         if (!$pixValid['isValid']) {
             return $this->createResult(
@@ -80,13 +78,11 @@ class CardBankSlipPixValidator extends AbstractValidator
     {
         $result = ['isValid' => true, 'failsDescription' => []];
 
-        // Check if required fields are present
         if (!isset($response['status_id'])) {
             $result['isValid'] = false;
             $result['failsDescription'][] = __('Missing status_id in bank slip response');
         }
 
-        // Check if status is valid
         if (isset($response['status_id']) && !in_array($response['status_id'], ['3', '4'])) {
             $result['isValid'] = false;
             $result['failsDescription'][] = __(
@@ -95,7 +91,6 @@ class CardBankSlipPixValidator extends AbstractValidator
             );
         }
 
-        // Check if bank slip information exists
         if (!isset($response['bank_slip']) || !isset($response['bank_slip']['url'])) {
             $result['isValid'] = false;
             $result['failsDescription'][] = __('Missing bank slip URL in response');
@@ -119,13 +114,11 @@ class CardBankSlipPixValidator extends AbstractValidator
     {
         $result = ['isValid' => true, 'failsDescription' => []];
 
-        // Check if required fields are present
         if (!isset($response['status_id'])) {
             $result['isValid'] = false;
             $result['failsDescription'][] = __('Missing status_id in PIX response');
         }
 
-        // Check if status is valid
         if (isset($response['status_id']) && !in_array($response['status_id'], ['3', '4'])) {
             $result['isValid'] = false;
             $result['failsDescription'][] = __(
@@ -134,13 +127,11 @@ class CardBankSlipPixValidator extends AbstractValidator
             );
         }
 
-        // Check if PIX code exists
         if (!isset($response['pix_code'])) {
             $result['isValid'] = false;
             $result['failsDescription'][] = __('Missing PIX code in response');
         }
 
-        // Check if transaction ID exists
         if (!isset($response['tid'])) {
             $result['isValid'] = false;
             $result['failsDescription'][] = __('Missing transaction ID in PIX response');

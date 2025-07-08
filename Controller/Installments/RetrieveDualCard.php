@@ -90,7 +90,6 @@ class RetrieveDualCard extends Action implements HttpPostActionInterface, CsrfAw
 
             $this->logger->info('[DUAL_CARD] Requisição recebida:', ['body' => $bodyParams]);
 
-            // Validar estrutura da requisição
             if (!$this->validateRequestStructure($bodyParams)) {
                 $this->logger->error('[DUAL_CARD] Estrutura da requisição inválida');
                 $result->setHttpResponseCode(400);
@@ -122,24 +121,19 @@ class RetrieveDualCard extends Action implements HttpPostActionInterface, CsrfAw
      */
     private function validateRequestStructure(array $bodyParams): bool
     {
-        // Verificar se é contexto de dois cartões
         if (empty($bodyParams['payment_context']) || $bodyParams['payment_context'] !== 'dual_card') {
             return false;
         }
 
-        // Verificar se tem array de cartões
         if (empty($bodyParams['cards']) || !is_array($bodyParams['cards'])) {
             return false;
         }
 
-        // Verificar se tem valor total
         if (!isset($bodyParams['total_order_value']) || !is_numeric($bodyParams['total_order_value'])) {
             return false;
         }
 
-        // Validar cada cartão
         foreach ($bodyParams['cards'] as $card) {
-            // Só exigir valor e índice do cartão - tipo não é obrigatório
             if (empty($card['amount']) || !is_numeric($card['amount'])) {
                 return false;
             }
@@ -148,7 +142,6 @@ class RetrieveDualCard extends Action implements HttpPostActionInterface, CsrfAw
                 return false;
             }
 
-            // Se cc_type não estiver presente, usar valor padrão
             if (empty($card['cc_type'])) {
                 $bodyParams['cards'][array_search($card, $bodyParams['cards'])]['cc_type'] = 'VI';
             }
@@ -189,11 +182,9 @@ class RetrieveDualCard extends Action implements HttpPostActionInterface, CsrfAw
                 'context' => $context
             ]);
 
-            // Salvar informações na sessão para cada cartão
             $this->session->setData("vindi_cc_type_card_{$cardIndex}", $ccType);
             $this->session->setData("vindi_amount_card_{$cardIndex}", $amount);
 
-            // Obter parcelas específicas para este cartão
             $installments = $this->helperInstallments->getAllInstallments($amount, $ccType, $storeId);
 
             $installmentsData['cards'][] = [
@@ -210,7 +201,6 @@ class RetrieveDualCard extends Action implements HttpPostActionInterface, CsrfAw
             ]);
         }
 
-        // Salvar contexto geral na sessão
         $this->session->setData('vindi_payment_context', 'dual_card');
         $this->session->setData('vindi_dual_card_data', $installmentsData);
 

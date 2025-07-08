@@ -720,7 +720,6 @@ class Data extends \Magento\Payment\Helper\Data
      */
     private function maskSensitiveValue(string $key, $value)
     {
-        // Sensitive field patterns
         $sensitiveFields = [
             'card_number',
             'card_cvv',
@@ -734,18 +733,15 @@ class Data extends \Magento\Payment\Helper\Data
             'secret'
         ];
 
-        // Check if key contains sensitive information
         $keyLower = strtolower($key);
         foreach ($sensitiveFields as $sensitiveField) {
             if (strpos($keyLower, $sensitiveField) !== false) {
                 if (is_string($value) && !empty($value)) {
                     if ($sensitiveField === 'card_number' || $sensitiveField === 'cc_number') {
-                        // For card numbers, show only first 4 and last 4 digits
                         if (strlen($value) >= 8) {
                             return substr($value, 0, 4) . '****' . substr($value, -4);
                         }
                     } else {
-                        // For other sensitive fields, mask completely
                         return str_repeat('*', min(strlen($value), 8));
                     }
                 }
@@ -753,7 +749,6 @@ class Data extends \Magento\Payment\Helper\Data
             }
         }
 
-        // Recursively process arrays and objects
         if (is_array($value)) {
             return $this->maskSensitiveData($value);
         }
@@ -781,10 +776,8 @@ class Data extends \Magento\Payment\Helper\Data
             $uri = $this->helperConfig->getEndpointConfig($type . '_uri_sandbox', $storeId);
         }
 
-        // Remove trailing slash from URI if present
         $uri = rtrim($uri, '/');
         
-        // Add leading slash to endpoint if not present
         if (!str_starts_with($endpoint, '/')) {
             $endpoint = '/' . $endpoint;
         }
@@ -800,8 +793,6 @@ class Data extends \Magento\Payment\Helper\Data
      */
     public function getPublicKey(?int $storeId = null): string
     {
-        // Based on the implementation pattern, the public key is likely the consumer key
-        // or access token used for API authentication
         return $this->getConsumerKey($storeId);
     }
 

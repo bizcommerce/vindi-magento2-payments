@@ -88,10 +88,9 @@ class CancellationService
         $this->logger->execute('Starting webhook cancellation process: ' . json_encode($webhookData), 'vindi-cancellation');
 
         try {
-            // Extract transaction info from webhook
             $transaction = $webhookData['transaction'] ?? [];
-            $orderNumber = $transaction['order_number'] ?? '';  // This is Magento increment ID
-            $vindiTransactionId = $transaction['transaction_id'] ?? '';  // This is Vindi transaction ID
+            $orderNumber = $transaction['order_number'] ?? '';
+            $vindiTransactionId = $transaction['transaction_id'] ?? '';
             $statusId = $transaction['status_id'] ?? '';
 
             file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Webhook data - Order Number: ' . $orderNumber . ', Vindi Transaction ID: ' . $vindiTransactionId . ', Status: ' . $statusId . PHP_EOL, FILE_APPEND);
@@ -100,7 +99,6 @@ class CancellationService
                 throw new CancellationException('Missing order_number in webhook data');
             }
 
-            // Check if it's a multi-payment transaction
             if (preg_match('/(.*?)-(\d{2})$/', $orderNumber, $matches)) {
                 return $this->processMultiPaymentCancellation($matches[1], $transaction);
             } else {
@@ -134,10 +132,8 @@ class CancellationService
         $this->logger->execute('Starting transaction cancellation - ID: ' . $transactionId . ', Amount: ' . ($refundAmount ?: 'full'), 'vindi-cancellation');
 
         try {
-            // Get access token
             $accessToken = $this->helperData->getAccessToken($storeId);
 
-            // Call Vindi API to cancel transaction
             $response = $this->api->cancel()->cancelWithAmount(
                 $transactionId,
                 $accessToken,
@@ -145,10 +141,8 @@ class CancellationService
                 $storeId
             );
 
-            // Log API response
             $this->logger->execute('Vindi API cancellation response for ' . $transactionId . ': ' . json_encode($response), 'vindi-cancellation');
 
-            // Check if cancellation was successful
             if ($this->isCancellationSuccessful($response)) {
                 return new CancellationResult(
                     self::CANCELLATION_SUCCESS,
@@ -186,18 +180,15 @@ class CancellationService
         file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Processing multi-payment cancellation for order: ' . $orderIncrementId . PHP_EOL, FILE_APPEND);
         $this->logger->execute('Processing multi-payment cancellation for order: ' . $orderIncrementId, 'vindi-cancellation');
 
-        // Load order
         $order = $this->helperOrder->loadOrder($orderIncrementId);
         if (!$order || !$order->getId()) {
             file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Order not found: ' . $orderIncrementId . PHP_EOL, FILE_APPEND);
             throw new CancellationException("Order {$orderIncrementId} not found");
         }
 
-        // Extract transaction_id from webhook (this is the Vindi transaction ID to cancel)
         $currentTransactionId = $transactionData['transaction_id'] ?? null;
         file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Current transaction ID to cancel: ' . $currentTransactionId . PHP_EOL, FILE_APPEND);
 
-        // Check for existing invoices to cancel (not refund for STATUS_DENIED)
         $invoices = $order->getInvoiceCollection();
         if (count($invoices) > 0) {
             file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Found ' . count($invoices) . ' invoices. Cancelling order and invoices...' . PHP_EOL, FILE_APPEND);
@@ -208,7 +199,6 @@ class CancellationService
         $results = [];
         $allSuccessful = true;
 
-        // Cancel the specific transaction from webhook first
         if ($currentTransactionId) {
             file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Cancelling current transaction: ' . $currentTransactionId . PHP_EOL, FILE_APPEND);
             $result = $this->cancelTransaction($currentTransactionId, null, (int)$order->getStoreId());
@@ -223,12 +213,10 @@ class CancellationService
             }
         }
 
-        // Find and cancel all other related transactions for this order
         $relatedTransactions = $this->findRelatedTransactions($order);
         file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Found related transactions: ' . json_encode($relatedTransactions) . PHP_EOL, FILE_APPEND);
 
         foreach ($relatedTransactions as $txnId) {
-            // Skip if already processed
             if ($txnId === $currentTransactionId) {
                 continue;
             }
@@ -246,7 +234,6 @@ class CancellationService
             }
         }
 
-        // Always cancel order in Magento for STATUS_DENIED (force cancellation)
         file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Forcing Magento order cancellation.' . PHP_EOL, FILE_APPEND);
         $this->cancelMagentoOrder($order, 'Order cancellation due to payment denial');
 
@@ -273,13 +260,11 @@ class CancellationService
     {
         $this->logger->execute('Processing single payment cancellation for order: ' . $orderNumber, 'vindi-cancellation');
 
-        // Load order using order_number (increment ID)
         $order = $this->helperOrder->loadOrder($orderNumber);
         if (!$order || !$order->getId()) {
             throw new CancellationException("Order {$orderNumber} not found");
         }
 
-        // Use transaction_id from webhook data to cancel at Vindi
         $vindiTransactionId = $transactionData['transaction_id'] ?? null;
         file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Single payment - Order: ' . $orderNumber . ', Vindi Transaction ID: ' . $vindiTransactionId . PHP_EOL, FILE_APPEND);
 
@@ -287,14 +272,12 @@ class CancellationService
             throw new CancellationException("Missing transaction_id in webhook data for order {$orderNumber}");
         }
 
-        // Cancel transaction via API using the correct Vindi transaction ID
         $result = $this->cancelTransaction(
             $vindiTransactionId,
             null,
             (int)$order->getStoreId()
         );
 
-        // Cancel order in Magento if cancellation was successful
         if ($result->getStatus() === self::CANCELLATION_SUCCESS) {
             $this->cancelMagentoOrder($order, 'Transaction cancelled via webhook');
         }
@@ -313,13 +296,11 @@ class CancellationService
         $transactions = [];
         $payment = $order->getPayment();
 
-        // Get primary transaction ID
         $primaryTid = $payment->getAdditionalInformation('tid');
         if ($primaryTid) {
             $transactions[] = $primaryTid;
         }
 
-        // Get multi-payment info for secondary transactions
         $multiPaymentInfo = $payment->getAdditionalInformation('multi_payment_info') ?: [];
         foreach ($multiPaymentInfo as $info) {
             if (isset($info['transaction_id']) && !in_array($info['transaction_id'], $transactions)) {
@@ -342,7 +323,6 @@ class CancellationService
         try {
             file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Attempting to cancel order ' . $order->getIncrementId() . ' - Can cancel: ' . ($order->canCancel() ? 'YES' : 'NO') . PHP_EOL, FILE_APPEND);
 
-            // Force cancellation using HelperOrder regardless of canCancel()
             $this->helperOrder->cancelOrder($order, (float)$order->getGrandTotal(), true);
             $order->addCommentToStatusHistory("Order cancelled: {$reason}");
             $order->save();
@@ -354,7 +334,6 @@ class CancellationService
             file_put_contents('/tmp/vindi_cancellation_debug.log', date('Y-m-d H:i:s') . ' - [CancellationService] Failed to cancel order: ' . $e->getMessage() . PHP_EOL, FILE_APPEND);
             $this->logger->execute('Failed to cancel order in Magento - Order ID: ' . $order->getIncrementId() . ', Error: ' . $e->getMessage(), 'vindi-cancellation');
 
-            // Try alternative approach - direct status change if normal cancellation fails
             try {
                 $order->setState('canceled');
                 $order->setStatus('canceled');
@@ -375,7 +354,6 @@ class CancellationService
      */
     private function isCancellationSuccessful(array $response): bool
     {
-        // Check for success indicators in Vindi API response
         if (isset($response['status']) && $response['status'] === 200) {
             return true;
         }

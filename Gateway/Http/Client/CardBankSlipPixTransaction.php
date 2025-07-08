@@ -87,7 +87,6 @@ class CardBankSlipPixTransaction implements ClientInterface
         $this->logRequest($request);
         $storeId = $request['client_config']['store_id'] ?? null;
 
-        // Process only the card payment (primary transaction)
         $cardResponse = $this->processCardPayment($request, $storeId);
 
         if ($this->isSuccessfulCardResponse($cardResponse)) {
@@ -97,7 +96,6 @@ class CardBankSlipPixTransaction implements ClientInterface
             ];
         }
 
-        // Card payment failed
         return [
             'error' => true,
             'transaction' => $cardResponse
@@ -128,7 +126,6 @@ class CardBankSlipPixTransaction implements ClientInterface
             $responseBody = $client->request()->getBody();
             $response = $this->json->unserialize($responseBody);
 
-            // Log the response
             $this->logger->debug([
                 'method' => $this->methodCode,
                 'response' => $this->helper->maskSensitiveData($response)
@@ -171,7 +168,6 @@ class CardBankSlipPixTransaction implements ClientInterface
             $responseBody = $client->request()->getBody();
             $response = $this->json->unserialize($responseBody);
 
-            // Log the response
             $this->logger->debug([
                 'method' => $this->methodCode,
                 'response' => $this->helper->maskSensitiveData($response)
@@ -216,7 +212,6 @@ class CardBankSlipPixTransaction implements ClientInterface
             $responseBody = $client->request()->getBody();
             $cancelResponse = $this->json->unserialize($responseBody);
 
-            // Log the response
             $this->logger->debug([
                 'method' => $this->methodCode,
                 'bankslipCancel' => $cancelResponse
@@ -282,7 +277,6 @@ class CardBankSlipPixTransaction implements ClientInterface
             $responseBody = $client->request()->getBody();
             $response = $this->json->unserialize($responseBody);
 
-            // Log the response
             $this->logger->debug([
                 'method' => $this->methodCode,
                 'response' => $this->helper->maskSensitiveData($response)
@@ -321,7 +315,6 @@ class CardBankSlipPixTransaction implements ClientInterface
      */
     private function logRequest(array $request): void
     {
-        // Mask sensitive data before logging
         $maskedRequest = $this->helper->maskSensitiveData($request);
 
         $this->logger->debug([

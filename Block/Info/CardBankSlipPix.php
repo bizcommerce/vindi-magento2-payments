@@ -110,7 +110,6 @@ class CardBankSlipPix extends AbstractInfo
         $payment = $this->getInfo();
         $status = $payment->getAdditionalInformation('card_status');
 
-        // Map status codes to readable names
         $statusMap = [
             '1' => __('Pending'),
             '2' => __('Processing'),
@@ -181,7 +180,7 @@ class CardBankSlipPix extends AbstractInfo
     {
         $payment = $this->getInfo();
         $cardStatus = $payment->getAdditionalInformation('card_status');
-        return in_array($cardStatus, ['3', '4']); // Authorized or Captured
+        return in_array($cardStatus, ['3', '4']);
     }
 
     /**

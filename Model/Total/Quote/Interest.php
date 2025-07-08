@@ -62,7 +62,6 @@ class Interest extends AbstractTotal
         $installments = 0;
 
         /** @var Quote $quote */
-        //Prepared for Vindi transparent
         $quoteId = $this->checkoutSession->getQuoteId();
         if ($quoteId) {
             $quote = $this->quoteRepository->get($quoteId);

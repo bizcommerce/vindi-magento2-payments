@@ -81,19 +81,16 @@ class TransactionHandler implements HandlerInterface
         $payment = $paymentDO->getPayment();
         $order = $payment->getOrder();
 
-        // Log para debug
         $this->helper->log(
             "CardBankSlipPix TransactionHandler - Processing order {$order->getIncrementId()}",
             'cardbankslippix_handler'
         );
 
-        // Process Card response (primary transaction)
         if (isset($response['transaction'])) {
             $cardTransaction = $response['transaction'];
             $cardTid = $cardTransaction['payment']['tid'] ?? '';
             $cardStatus = $cardTransaction['status_id'] ?? '';
 
-            // Use transaction_id as fallback when tid is empty (for declined transactions)
             if (empty($cardTid) && isset($cardTransaction['transaction_id'])) {
                 $cardTid = (string)$cardTransaction['transaction_id'];
 
@@ -103,17 +100,14 @@ class TransactionHandler implements HandlerInterface
                 );
             }
 
-            // Store card payment information
             $payment->setAdditionalInformation('card_payment_tid', $cardTid);
             $payment->setAdditionalInformation('card_status', $cardStatus);
             $payment->setAdditionalInformation('card_installments', $payment->getAdditionalInformation('installments'));
             $payment->setAdditionalInformation('card_amount', $payment->getAdditionalInformation('amount_credit'));
 
-            // Set the transaction ID for the card portion - ensure it's not empty
             if (!empty($cardTid)) {
                 $payment->setTransactionId($cardTid);
             } else {
-                // Last resort: use order increment ID with timestamp
                 $fallbackTid = $order->getIncrementId() . '-' . time();
                 $payment->setTransactionId($fallbackTid);
 
@@ -125,12 +119,9 @@ class TransactionHandler implements HandlerInterface
 
             $payment->setIsTransactionClosed(false);
 
-            // Check if card payment was successful
             if ($this->isSuccessfulResponse($cardTransaction)) {
-                // Card payment success - update existing Bolepix queue record with card TID and keep pending status
                 $this->updateQueueRecords($order, $cardTid, MultiPaymentQueue::STATUS_PENDING);
 
-                // Set payment status
                 $payment->setAdditionalInformation('payment_status', 'card_approved_bolepix_pending');
 
                 $this->helper->log(
@@ -138,10 +129,8 @@ class TransactionHandler implements HandlerInterface
                     'cardbankslippix_handler'
                 );
             } else {
-                // Card payment failed - update existing Bolepix queue record to failed status (cancelled due to card failure)
                 $this->updateQueueRecords($order, $cardTid, MultiPaymentQueue::STATUS_FAILED);
 
-                // Set payment status
                 $payment->setAdditionalInformation('payment_status', 'card_failed_bolepix_cancelled');
 
                 $this->helper->log(
@@ -149,13 +138,11 @@ class TransactionHandler implements HandlerInterface
                     'cardbankslippix_handler'
                 );
 
-                // Mark payment as failed but don't throw exception to allow order processing
                 $payment->setIsTransactionPending(false);
                 $payment->setIsTransactionClosed(true);
             }
         }
 
-        // Store the complete response data as additional information
         $payment->setAdditionalInformation('vindi_response', $this->serializer->serialize($response));
     }
 
@@ -170,7 +157,6 @@ class TransactionHandler implements HandlerInterface
     private function updateQueueRecords($order, string $cardTid, string $status): void
     {
         try {
-            // Find the existing Bolepix queue record for this order
             $queueItems = $this->multiPaymentQueueService->getByOrderId((int)$order->getId());
 
             $bolepixQueueFound = false;
@@ -184,17 +170,15 @@ class TransactionHandler implements HandlerInterface
                 if ($queueItem->getSecondaryMethodType() === MultiPaymentQueue::SECONDARY_METHOD_BOLEPIX) {
                     $bolepixQueueFound = true;
 
-                    // Update the queue record with card TID and status
                     $queueItem->setPrimaryTransactionId($cardTid);
 
-                    // Use the updateStatus method to save
                     $this->multiPaymentQueueService->updateStatus($queueItem, $status, [], $errorMessage);
 
                     $this->helper->log(
                         "CardBankSlipPix - Updated Bolepix queue record for order {$order->getIncrementId()} with card TID: {$cardTid}, status: {$status}",
                         'cardbankslippix_queue'
                     );
-                    break; // Only one Bolepix record per order
+                    break;
                 }
             }
 
@@ -221,11 +205,9 @@ class TransactionHandler implements HandlerInterface
      */
     private function isSuccessfulResponse(array $response): bool
     {
-        // Check if we have a successful card transaction
         $statusId = $response['status_id'] ?? null;
         $tid = $response['payment']['tid'] ?? null;
 
-        // Status 3 = Authorized, Status 4 = Captured - both are successful for cards
         return !empty($tid) && in_array($statusId, ['3', '4']);
     }
 }

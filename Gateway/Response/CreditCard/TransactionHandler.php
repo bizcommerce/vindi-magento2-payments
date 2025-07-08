@@ -137,7 +137,6 @@ class TransactionHandler implements HandlerInterface
                     $payment->setCcLast4($creditCard->getData('cc_last_4'));
                 }
             } catch (NoSuchEntityException $e) {
-                // Do nothing if credit card record not found
             }
         }
 

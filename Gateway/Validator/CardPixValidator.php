@@ -49,7 +49,6 @@ class CardPixValidator extends AbstractValidator
             return $this->createResult(false, $errorMessages);
         }
 
-        // Validate the card response
         $cardValid = $this->validateCardResponse($response['card_response'] ?? []);
         if (!$cardValid['isValid']) {
             return $this->createResult(
@@ -58,7 +57,6 @@ class CardPixValidator extends AbstractValidator
             );
         }
 
-        // Validate the PIX response
         $pixValid = $this->validatePixResponse($response['pix_response'] ?? []);
         if (!$pixValid['isValid']) {
             return $this->createResult(
@@ -80,13 +78,11 @@ class CardPixValidator extends AbstractValidator
     {
         $result = ['isValid' => true, 'failsDescription' => []];
 
-        // Check if required fields are present
         if (!isset($response['status_id'])) {
             $result['isValid'] = false;
             $result['failsDescription'][] = __('Missing status_id in card response');
         }
 
-        // Check if status is valid
         if (isset($response['status_id']) && !in_array($response['status_id'], ['3', '4'])) {
             $result['isValid'] = false;
             $result['failsDescription'][] = __(
@@ -95,7 +91,6 @@ class CardPixValidator extends AbstractValidator
             );
         }
 
-        // Check if payment transaction ID exists
         if (!isset($response['payment']['tid'])) {
             $result['isValid'] = false;
             $result['failsDescription'][] = __('Missing transaction ID in card response');
@@ -114,13 +109,11 @@ class CardPixValidator extends AbstractValidator
     {
         $result = ['isValid' => true, 'failsDescription' => []];
 
-        // Check if required fields are present
         if (!isset($response['status_id'])) {
             $result['isValid'] = false;
             $result['failsDescription'][] = __('Missing status_id in PIX response');
         }
 
-        // Check if status is valid
         if (isset($response['status_id']) && !in_array($response['status_id'], ['3', '4'])) {
             $result['isValid'] = false;
             $result['failsDescription'][] = __(
@@ -129,13 +122,11 @@ class CardPixValidator extends AbstractValidator
             );
         }
 
-        // Check if payment transaction ID exists
         if (!isset($response['payment']['tid'])) {
             $result['isValid'] = false;
             $result['failsDescription'][] = __('Missing transaction ID in PIX response');
         }
 
-        // Check if PIX code exists
         if (!isset($response['payment']['pix_code'])) {
             $result['isValid'] = false;
             $result['failsDescription'][] = __('Missing PIX code in response');

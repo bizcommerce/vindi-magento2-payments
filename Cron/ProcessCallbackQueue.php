@@ -120,12 +120,10 @@ class ProcessCallbackQueue
                         $transactionId = $transaction['order_number'] ?? ($transaction['free'] ?? '');
                         $statusId = $transaction['status_id'];
 
-                        // Check if it's a multi-payment webhook
                         if (preg_match('/(.*?)-(\d{2})$/', $transactionId, $matches)) {
                             $orderIncrementId = $matches[1];
                             $this->logger->info(__('Multi-payment webhook detected for order %1.', $orderIncrementId));
 
-                            // === ADIÇÃO: Log extra para multi-payment ===
                             file_put_contents('/tmp/vindi_multipayment.log', date('Y-m-d H:i:s') . ' - Multi-payment detected: ' . $orderIncrementId . ' - Status: ' . $statusId . PHP_EOL, FILE_APPEND);
 
                             $order = $this->helperOrder->loadOrder($orderIncrementId);
@@ -133,14 +131,12 @@ class ProcessCallbackQueue
                                 throw new \Exception((string) __('Order %1 not found for multi-payment callback.', $orderIncrementId));
                             }
 
-                            // Log detailed status information for debugging
                             file_put_contents('/tmp/vindi_callback_debug.log', date('Y-m-d H:i:s') . ' - Multi-payment status check - Order: ' . $orderIncrementId . ', Status ID: ' . $statusId . ', STATUS_APPROVED: ' . HelperOrder::STATUS_APPROVED . ', STATUS_REFUNDED: ' . HelperOrder::STATUS_REFUNDED . ', STATUS_DENIED: ' . HelperOrder::STATUS_DENIED . PHP_EOL, FILE_APPEND);
 
                             if ($statusId == HelperOrder::STATUS_APPROVED) {
                                 file_put_contents('/tmp/vindi_callback_debug.log', date('Y-m-d H:i:s') . ' - Processing approval webhook for multi-payment order ' . $orderIncrementId . PHP_EOL, FILE_APPEND);
                                 $this->multiPaymentHandler->processSuccess($order, $transaction);
                             } elseif ($statusId == HelperOrder::STATUS_REFUNDED) {
-                                // Process refund/cancellation via CancellationService
                                 file_put_contents('/tmp/vindi_callback_debug.log', date('Y-m-d H:i:s') . ' - Processing refund/cancellation webhook for multi-payment order ' . $orderIncrementId . PHP_EOL, FILE_APPEND);
                                 try {
                                     $this->cancellationService->processWebhookCancellation($params);
@@ -148,7 +144,6 @@ class ProcessCallbackQueue
                                     file_put_contents('/tmp/vindi_callback_debug.log', date('Y-m-d H:i:s') . ' - Failed to process cancellation for order ' . $orderIncrementId . ': ' . $cancelException->getMessage() . PHP_EOL, FILE_APPEND);
                                 }
                             } elseif ($statusId == HelperOrder::STATUS_DENIED) {
-                                // ✅ NOVO: Tratar STATUS_DENIED como cancelamento também
                                 file_put_contents('/tmp/vindi_callback_debug.log', date('Y-m-d H:i:s') . ' - Processing denial/cancellation webhook for multi-payment order ' . $orderIncrementId . PHP_EOL, FILE_APPEND);
                                 try {
                                     $this->cancellationService->processWebhookCancellation($params);
@@ -156,17 +151,14 @@ class ProcessCallbackQueue
                                     file_put_contents('/tmp/vindi_callback_debug.log', date('Y-m-d H:i:s') . ' - Failed to process denial cancellation for order ' . $orderIncrementId . ': ' . $cancelException->getMessage() . PHP_EOL, FILE_APPEND);
                                 }
                             } else {
-                                // Outros status de falha
                                 file_put_contents('/tmp/vindi_callback_debug.log', date('Y-m-d H:i:s') . ' - Processing failure webhook for multi-payment order ' . $orderIncrementId . '. Status ID: ' . $statusId . PHP_EOL, FILE_APPEND);
                                 $this->multiPaymentHandler->processFailure($order, $transaction);
                             }
 
                         } else {
-                            // Standard payment webhook logic
                             $order = $this->helperOrder->loadOrder($transactionId);
                             if ($order && $order->getId()) {
                                 if ($statusId == HelperOrder::STATUS_REFUNDED) {
-                                    // Process refund/cancellation via CancellationService
                                     $this->logger->info(__('Processing refund webhook for transaction %1.', $transactionId));
                                     try {
                                         $this->cancellationService->processWebhookCancellation($params);

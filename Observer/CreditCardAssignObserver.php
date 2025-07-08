@@ -76,20 +76,17 @@ class CreditCardAssignObserver extends AbstractDataAssignObserver
             $this->logger->info('[CreditCardAssignObserver] AdditionalData: ' . $this->json->serialize($additionalData ?? []));
 
             if (!empty($additionalData)) {
-                // Recupera o modelo de pagamento
                 /** @var Payment $paymentInfo */
                 $paymentInfo = $this->readPaymentModelArgument($observer);
                 $method = $paymentInfo->getMethod();
 
                 $this->logger->info('[CreditCardAssignObserver] Método de pagamento: ' . $method);
 
-                // Métodos que precisam receber os dados do cartão
                 $metodosQuePrecisamDeCartao = [
                     'vindi_vp_cc',
                     'vindi_vp_cardpix',
                     'vindi_vp_cardbankslippix',
                     'vindi_vp_cardcard',
-                    // Adicione outros métodos multimeios aqui se necessário
                 ];
 
                 if (isset($additionalData['cc_number']) && in_array($method, $metodosQuePrecisamDeCartao)) {
@@ -125,10 +122,8 @@ class CreditCardAssignObserver extends AbstractDataAssignObserver
                     $paymentInfo->setAdditionalInformation('save_card', $saveCard);
                     $paymentInfo->setAdditionalInformation('cc_cid', $additionalData['cc_cid'] ?? null);
 
-                    // Capturar valores específicos para multimeios
                     if (in_array($method, ['vindi_vp_cardpix', 'vindi_vp_cardbankslippix', 'vindi_vp_cardcard'])) {
                         if ($method === 'vindi_vp_cardcard') {
-                            // Para CardCard, usar os valores específicos dos cartões
                             $amountCard1 = $additionalData['amount_card1'] ?? 0;
                             $amountCard2 = $additionalData['amount_card2'] ?? 0;
                             
@@ -137,7 +132,6 @@ class CreditCardAssignObserver extends AbstractDataAssignObserver
                             $paymentInfo->setAdditionalInformation('amount_card1', (float)$amountCard1);
                             $paymentInfo->setAdditionalInformation('amount_card2', (float)$amountCard2);
                         } else {
-                            // Para outros métodos multimeios (CardPix, etc.)
                             $amountCredit = $additionalData['amount_credit'] ?? 0;
                             $amountPix = $additionalData['amount_pix'] ?? 0;
                             
@@ -146,11 +140,9 @@ class CreditCardAssignObserver extends AbstractDataAssignObserver
                         }
                     }
 
-                    // CVV é sempre obrigatório para todos os cartões
                     $paymentInfo->setAdditionalInformation('cc_cid_required', true);
                 }
 
-                // Novo: tratamento do segundo cartão para CardCard
                 if ($method === 'vindi_vp_cardcard' && isset($additionalData['cc_number_2'])) {
                     $this->logger->info('[CreditCardAssignObserver] Processando dados do segundo cartão');
                     
@@ -178,7 +170,6 @@ class CreditCardAssignObserver extends AbstractDataAssignObserver
                     $paymentInfo->setAdditionalInformation('cc_exp_month_2', $ccExpMonth2);
                     $paymentInfo->setAdditionalInformation('cc_exp_year_2', $ccExpYear2);
 
-                    // CVV é sempre obrigatório para o segundo cartão também
                     $paymentInfo->setAdditionalInformation('cc_cid_2_required', true);
                     
                     $this->logger->info('[CreditCardAssignObserver] Segundo cartão processado com sucesso');

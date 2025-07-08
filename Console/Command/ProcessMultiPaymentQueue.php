@@ -96,7 +96,6 @@ class ProcessMultiPaymentQueue extends Command
         $limit = (int) $input->getOption('limit');
 
         try {
-            // Get pending items
             $pendingItems = $this->queueService->getPendingItems($limit);
 
             if (empty($pendingItems)) {
@@ -107,7 +106,6 @@ class ProcessMultiPaymentQueue extends Command
             $output->writeln(sprintf('<info>Found %d pending queue item(s):</info>', count($pendingItems)));
             $output->writeln('');
 
-            // Display items in table format
             $this->displayQueueItems($pendingItems, $output);
 
             if ($dryRun) {
@@ -115,7 +113,6 @@ class ProcessMultiPaymentQueue extends Command
                 return Cli::RETURN_SUCCESS;
             }
 
-            // Process the queue
             $this->processMultiPaymentQueue->execute();
             $output->writeln('<info>Multi-payment queue processing executed successfully.</info>');
             return Cli::RETURN_SUCCESS;
@@ -145,7 +142,7 @@ class ProcessMultiPaymentQueue extends Command
                 '| %-7s | %-13s | %-6s | %-6s | $%-8.2f | %-8s |',
                 $queueItem->getId(),
                 $queueItem->getIncrementId(),
-                substr($queueItem->getPaymentMethod(), -6), // Show last 6 chars
+                substr($queueItem->getPaymentMethod(), -6),
                 $queueItem->getSecondaryMethodType(),
                 $queueItem->getSecondaryAmount(),
                 $queueItem->getStatus()

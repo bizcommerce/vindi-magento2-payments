@@ -87,7 +87,6 @@ class CardPixTransaction implements ClientInterface
         $this->logRequest($request);
         $storeId = $request['client_config']['store_id'] ?? null;
 
-        // Process only the card payment (primary transaction)
         $cardResponse = $this->processCardPayment($request, $storeId);
 
         if ($this->isSuccessfulCardResponse($cardResponse)) {
@@ -97,7 +96,6 @@ class CardPixTransaction implements ClientInterface
             ];
         }
 
-        // Card payment failed
         return [
             'error' => true,
             'transaction' => $cardResponse
@@ -128,7 +126,6 @@ class CardPixTransaction implements ClientInterface
             $responseBody = $client->request()->getBody();
             $response = $this->json->unserialize($responseBody);
 
-            // Log the response
             $this->logger->debug([
                 'method' => $this->methodCode,
                 'response' => $this->helper->maskSensitiveData($response)
@@ -170,7 +167,6 @@ class CardPixTransaction implements ClientInterface
             $responseBody = $client->request()->getBody();
             $response = $this->json->unserialize($responseBody);
 
-            // Log the response
             $this->logger->debug([
                 'method' => $this->methodCode,
                 'response' => $this->helper->maskSensitiveData($response)
@@ -204,7 +200,6 @@ class CardPixTransaction implements ClientInterface
 
             $tid = $cardResponse['payment']['tid'];
 
-            // Get access token
             $token = $this->accessToken->getToken($storeId);
 
             if (!$token) {
@@ -224,7 +219,6 @@ class CardPixTransaction implements ClientInterface
             $responseBody = $client->request()->getBody();
             $response = $this->json->unserialize($responseBody);
 
-            // Log the refund response
             $this->logger->debug([
                 'method' => $this->methodCode,
                 'refund_response' => $response
@@ -280,7 +274,6 @@ class CardPixTransaction implements ClientInterface
         $cardRequest = $request['card_request'] ?? [];
         $pixRequest = $request['pix_request'] ?? [];
 
-        // Mask sensitive information in card request
         if (isset($cardRequest['payment']['card_number'])) {
             $cardRequest['payment']['card_number'] = $this->helper->maskCardNumber(
                 $cardRequest['payment']['card_number']

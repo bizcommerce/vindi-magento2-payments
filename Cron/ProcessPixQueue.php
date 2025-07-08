@@ -48,8 +48,6 @@ class ProcessPixQueue
                 $pixQueue->setAttempts($pixQueue->getAttempts() + 1);
                 $pixQueue->save();
 
-                // Aqui você deve implementar a chamada ao PSP Pix
-                // Exemplo fictício:
                 $meta = json_decode($pixQueue->getPaymentMeta(), true);
                 $pixResult = $this->sendPixToPsp($pixQueue->getAmountPix(), $meta);
 
@@ -76,7 +74,6 @@ class ProcessPixQueue
 
     private function sendPixToPsp($amountPix, $meta)
     {
-        // Exemplo de chamada real ao PSP Pix
         try {
             $endpoint = $meta['psp_endpoint'] ?? 'https://psp.exemplo.com/pix';
             $apiKey = $meta['psp_api_key'] ?? '';
@@ -113,7 +110,6 @@ class ProcessPixQueue
         if ($order && $order->canInvoice()) {
             $this->helperOrder->captureOrder($order, 'online');
         }
-        // Enviar e-mail de confirmação de pedido
         if ($order && !$order->getEmailSent()) {
             try {
                 $order->sendNewOrderEmail();
@@ -131,6 +127,5 @@ class ProcessPixQueue
             $this->helperOrder->refundOrder($order, $grandTotal, false);
             $this->helperOrder->cancelOrder($order, $grandTotal, false);
         }
-        // Opcional: adicionar comentário de histórico
     }
 }

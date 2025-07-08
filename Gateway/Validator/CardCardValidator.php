@@ -37,16 +37,12 @@ class CardCardValidator extends AbstractValidator
 
         $response = $validationSubject['response'];
 
-        // Check for general error
         if (isset($response['error']) && $response['error'] === true) {
             $errorMessage = $response['message'] ?? 'Unknown error in CardCard payment';
             return $this->createResult(false, [$errorMessage]);
         }
 
-        // For CardCard, we only validate the first card response initially
-        // The second card will be processed asynchronously via queue
         if (isset($response['transaction'])) {
-            // Validate the first card response
             $card1Valid = $this->validateCardResponse($response['transaction'], 'first');
             if (!$card1Valid['isValid']) {
                 return $this->createResult(
@@ -72,13 +68,11 @@ class CardCardValidator extends AbstractValidator
     {
         $result = ['isValid' => true, 'failsDescription' => []];
 
-        // Check if required fields are present
         if (!isset($response['status_id'])) {
             $result['isValid'] = false;
             $result['failsDescription'][] = __('Missing status_id in %1 card response', $cardPosition);
         }
 
-        // Check if status is valid
         if (isset($response['status_id']) && !in_array($response['status_id'], ['3', '4'])) {
             $result['isValid'] = false;
             $result['failsDescription'][] = __(
@@ -88,7 +82,6 @@ class CardCardValidator extends AbstractValidator
             );
         }
 
-        // Check if payment transaction ID exists
         if (!isset($response['payment']['tid'])) {
             $result['isValid'] = false;
             $result['failsDescription'][] = __('Missing transaction ID in %1 card response', $cardPosition);

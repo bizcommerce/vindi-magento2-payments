@@ -222,15 +222,12 @@ class MultiPaymentQueueService
             $queueItem->setErrorMessage($errorMessage);
         }
 
-        // If status is failed and can retry, set next attempt time
         if ($status === MultiPaymentQueue::STATUS_FAILED && $queueItem->canRetry()) {
-            // Set next attempt time (exponential backoff: 2^attempts minutes)
             $delayMinutes = pow(2, $queueItem->getAttempts());
             $nextAttempt = date('Y-m-d H:i:s', strtotime("+{$delayMinutes} minutes"));
             $queueItem->setNextAttemptAt($nextAttempt);
         }
 
-        // For successful execution, clear error message and next attempt
         if ($status === MultiPaymentQueue::STATUS_EXECUTED) {
             $queueItem->setErrorMessage(null);
             $queueItem->setNextAttemptAt(null);

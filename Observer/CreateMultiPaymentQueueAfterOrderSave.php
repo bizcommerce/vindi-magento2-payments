@@ -74,15 +74,13 @@ class CreateMultiPaymentQueueAfterOrderSave implements ObserverInterface
         $this->logger->info("CreateMultiPaymentQueueAfterOrderSave - Processing queue data for order: " . $order->getIncrementId() . " - Data: " . json_encode($queueData));
 
         try {
-            // Use null for order_id if not available yet, will be updated later in response handler
         $orderId = $order->getId() ?: 0;
 
-            // Create the queue record with the provided data
             $this->multiPaymentQueueService->addToQueue(
                 $orderId,
                 $queueData['increment_id'],
                 $queueData['payment_method'],
-                '', // Primary transaction ID will be set later when primary response comes
+                '',
                 $queueData['secondary_method_type'],
                 $queueData['secondary_amount'],
                 $queueData['request_data'],

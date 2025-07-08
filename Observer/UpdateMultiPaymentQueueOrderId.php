@@ -72,14 +72,12 @@ class UpdateMultiPaymentQueueOrderId implements ObserverInterface
 
         $paymentMethod = $payment->getMethod();
         
-        // Only process multi-payment methods
         if (!in_array($paymentMethod, ['vindi_vp_cardpix', 'vindi_vp_cardcard', 'vindi_vp_cardbankslippix'])) {
             $this->logger->info("UpdateMultiPaymentQueueOrderId - Not a multi-payment method: {$paymentMethod}");
             return;
         }
 
         try {
-            // Update order_id in queue records for this increment_id
             $queueItems = $this->multiPaymentQueueService->getByIncrementId($order->getIncrementId());
             
             if (empty($queueItems)) {

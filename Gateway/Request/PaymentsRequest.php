@@ -166,10 +166,8 @@ class PaymentsRequest
         $shippingDescription = $order->getShippingDescription();
         $shippingType = $shippingDescription ? $shippingDescription : 'SEM_FRETE';
         
-        // Se não foi fornecido um valor específico, usar o valor total do shipping
         $shippingAmount = $order->getShippingAmount();
         if ($transactionAmount !== null && $order->getGrandTotal() > 0) {
-            // Calcular o shipping proporcional ao valor da transação
             $proportion = $transactionAmount / $order->getGrandTotal();
             $shippingAmount = round($shippingAmount * $proportion, 2);
         }
@@ -191,23 +189,19 @@ class PaymentsRequest
     {
         $originalDiscountAmount = abs((float) $order->getDiscountAmount());
         
-        // Se não há desconto no pedido, retornar 0
         if ($originalDiscountAmount <= 0) {
             return 0.0;
         }
         
-        // Se o valor da transação é igual ao total do pedido, usar o desconto completo
         if ($orderAmount >= $order->getGrandTotal()) {
             return round($originalDiscountAmount, 2);
         }
         
-        // Calcular desconto proporcional ao valor da transação
         $totalOrder = $order->getGrandTotal();
         if ($totalOrder > 0) {
             $proportion = $orderAmount / $totalOrder;
             $proportionalDiscount = $originalDiscountAmount * $proportion;
             
-            // Garantir que o desconto nunca seja maior que o valor da transação menos o frete
             $shippingAmount = (float) $order->getShippingAmount();
             $proportionalShipping = $shippingAmount * $proportion;
             $maxDiscount = $orderAmount - $proportionalShipping;
@@ -216,7 +210,6 @@ class PaymentsRequest
                 $proportionalDiscount = $maxDiscount;
             }
             
-            // Debug log
             error_log("DISCOUNT DEBUG - Order: {$order->getIncrementId()}, Original: {$originalDiscountAmount}, OrderAmount: {$orderAmount}, Total: {$totalOrder}, Proportion: {$proportion}, ProportionalDiscount: {$proportionalDiscount}, MaxDiscount: {$maxDiscount}");
             
             return round(max(0, $proportionalDiscount), 2);
@@ -234,14 +227,11 @@ class PaymentsRequest
      */
     protected function getPriceAdditional(Order $order, float $orderAmount): float
     {
-        // Para transações divididas (Card + Pix), normalmente não há price_additional
-        // O price_additional é usado quando o valor da transação é maior que a soma dos produtos + frete - desconto
         
         $baseSubtotal = (float) $order->getBaseSubtotal();
         $shippingAmount = (float) $order->getShippingAmount();
         $discountAmount = abs((float) $order->getDiscountAmount());
         
-        // Calcular valores proporcionais se não for o valor total do pedido
         if ($orderAmount < $order->getGrandTotal()) {
             $proportion = $orderAmount / $order->getGrandTotal();
             $baseSubtotal = $baseSubtotal * $proportion;
@@ -362,7 +352,6 @@ class PaymentsRequest
         $items = [];
         $quoteItems = $order->getAllItems();
         
-        // Calcular proporção se um valor específico for fornecido
         $proportion = 1.0;
         if ($transactionAmount !== null && $order->getBaseSubtotal() > 0) {
             $proportion = $transactionAmount / $order->getBaseSubtotal();
@@ -378,7 +367,6 @@ class PaymentsRequest
             $item['description'] = $quoteItem->getName();
             $item['quantity']    = (string) $quoteItem->getQtyOrdered();
             
-            // Aplicar proporção no preço unitário se necessário
             $priceUnit = $quoteItem->getPrice();
             if ($transactionAmount !== null) {
                 $priceUnit = round($priceUnit * $proportion, 2);

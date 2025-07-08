@@ -47,7 +47,6 @@ class TransferFactory implements TransferFactoryInterface
      */
     public function create(array $request)
     {
-        // Support for both new (request) and old (request_card) structures
         if (isset($request['request'])) {
             $this->transferBuilder->setBody($request['request']);
         } elseif (isset($request['request_card'])) {

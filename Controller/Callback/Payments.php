@@ -41,7 +41,6 @@ class Payments extends \Vindi\VP\Controller\Callback
             $content = $this->getContent($this->getRequest()) ?? '';
             $params = $this->getRequest()->getParams();
             
-            // === ADIÇÃO: Log extra para debugging ===
             if (empty($content) && !empty($params)) {
                 $this->helperData->log('Content empty, using params instead', self::LOG_NAME);
             }
@@ -49,7 +48,6 @@ class Payments extends \Vindi\VP\Controller\Callback
             $this->logParams($content, $params);
 
             if (isset($params['transaction'])) {
-                // === ADIÇÃO: Validação extra para multi-payment ===
                 $orderNumber = $params['transaction']['order_number'] ?? ($params['transaction']['free'] ?? '');
                 if (preg_match('/(.*?)-(\d{2})$/', $orderNumber)) {
                     $this->helperData->log('Multi-payment webhook detected in controller: ' . $orderNumber, self::LOG_NAME);
@@ -62,19 +60,16 @@ class Payments extends \Vindi\VP\Controller\Callback
                 $callBack->setPayload($this->json->serialize($params));
                 $callBack->setQueueStatus('pending');
                 
-                // === ADIÇÃO: Log antes de salvar ===
                 $this->helperData->log('Saving callback to queue: ' . ($params['transaction']['order_number'] ?? 'unknown'), self::LOG_NAME);
                 
                 $this->callbackResourceModel->save($callBack);
                 
-                // === ADIÇÃO: Log após salvar com sucesso ===
                 $this->helperData->log('Callback saved successfully', self::LOG_NAME);
             }
         } catch (\Exception $e) {
             $statusCode = 500;
             $this->helperData->log($e->getMessage());
             
-            // === ADIÇÃO: Log mais detalhado para debugging ===
             $this->helperData->log('Enhanced error details: ' . $e->getMessage(), self::LOG_NAME);
             $this->helperData->log('Error trace: ' . $e->getTraceAsString(), self::LOG_NAME);
         }

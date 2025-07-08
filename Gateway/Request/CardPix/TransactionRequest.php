@@ -143,18 +143,15 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         $payment = $buildSubject['payment']->getPayment();
         $order = $payment->getOrder();
 
-        // Valores de split vindos do frontend
         $amountCredit = (float)($payment->getAdditionalInformation('amount_credit') ?? 0);
         $amountPix = (float)($payment->getAdditionalInformation('amount_pix') ?? 0);
 
-        // Se não vierem valores, dividir meio a meio como fallback
         if ($amountCredit <= 0 && $amountPix <= 0) {
             $grandTotal = (float)$order->getGrandTotal();
             $amountCredit = round($grandTotal / 2, 2);
             $amountPix = $grandTotal - $amountCredit;
         }
 
-        // Log para debug dos valores
         $this->logger->info('CardPix Transaction Build - Order: ' . $order->getIncrementId() . 
                      ', Total: ' . $order->getGrandTotal() . 
                      ', Subtotal: ' . $order->getBaseSubtotal() .
@@ -163,17 +160,15 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
                      ', Credit: ' . $amountCredit . 
                      ', Pix: ' . $amountPix);
 
-        // Construir apenas a requisição do cartão (primeira transação)
         $cardRequest = $this->buildPrimaryCardRequest($order, $payment, $amountCredit);
 
-        // Salvar o registro do PIX na queue logo após criar a requisição do cartão
         $this->queuePixPayment($order, $payment, $amountPix);
 
         return [
             'request' => $cardRequest,
             'client_config' => [
                 'store_id' => (int)$order->getStoreId(),
-                'amount_pix' => $amountPix, // Para ser usado no response handler
+                'amount_pix' => $amountPix,
                 'increment_id' => $order->getIncrementId()
             ]
         ];
@@ -189,17 +184,13 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
      */
     private function buildPrimaryCardRequest($order, $payment, float $amountCredit): array
     {
-        // Get the base transaction request for the card amount only
         $transaction = $this->getTransaction($order, $amountCredit);
 
-        // Override order_number with increment_id-01 format for card payment
         $orderNumber = $order->getIncrementId() . '-01';
         $transaction['transaction']['order_number'] = $orderNumber;
 
-        // Log para confirmar o order_number
         $this->logger->info('CardPix Primary Transaction - Order Number: ' . $orderNumber . ', Amount: ' . $amountCredit);
 
-        // Add credit card payment data
         $paymentProfileId = $payment->getAdditionalInformation('payment_profile');
         if ($paymentProfileId) {
             $transaction['payment'] = $this->getSavedCardData((string)$paymentProfileId, $payment);
@@ -223,14 +214,11 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
      */
     private function buildCardRequest($order, $payment, float $amountCredit, float $amountPix, float $shipping, float $discount): array
     {
-        // Get the base transaction request
         $transaction = $this->getTransaction($order, $amountCredit);
 
-        // Aplicar desconto e frete proporcionais ao cartão - os campos já estão dentro de transaction
         $transaction['transaction']['price_discount'] = (string)$discount;
         $transaction['transaction']['shipping_price'] = (string)$shipping;
 
-        // Add credit card payment data
         $paymentProfileId = $payment->getAdditionalInformation('payment_profile');
         if ($paymentProfileId) {
             $transaction['payment'] = $this->getSavedCardData((string)$paymentProfileId, $payment);
@@ -254,20 +242,16 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
      */
     private function buildPixRequest($order, $payment, float $amountCredit, float $amountPix, float $shipping, float $discount): array
     {
-        // Get the base transaction request
         $transaction = $this->getTransaction($order, $amountPix);
 
-        // Aplicar desconto e frete proporcionais ao pix - os campos já estão dentro de transaction
         $transaction['transaction']['price_discount'] = (string)$discount;
         $transaction['transaction']['shipping_price'] = (string)$shipping;
 
-        // Add PIX payment data
         $transaction['payment'] = [
             'payment_method_id' => $this->helper->getMethodId('PIX'),
             'split' => 1
         ];
 
-        // Set specific PIX information in transaction
         $transaction['transaction']['order_number'] = $order->getIncrementId() . '-PIX';
 
         return $transaction;
@@ -301,7 +285,6 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
 
         $cvv = $payment->getAdditionalInformation('cc_cid') ?: $payment->getCcCid();
         
-        // CVV é sempre obrigatório para todos os cartões
         if (!$cvv || trim($cvv) === '') {
             throw new LocalizedException(__('CVV is required for all cards.'));
         }
@@ -374,13 +357,11 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
     private function queuePixPayment($order, $payment, float $amountPix): void
     {
         if ($amountPix <= 0) {
-            return; // No PIX amount to process
+            return;
         }
 
-        // Build PIX request data
         $pixRequestData = $this->buildPixRequestData($order, $payment, $amountPix);
 
-        // Prepare queue data for the event
         $queueData = [
             'increment_id' => (string)$order->getIncrementId(),
             'payment_method' => 'vindi_vp_cardpix',
@@ -390,7 +371,6 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
             'status' => MultiPaymentQueue::STATUS_PENDING
         ];
 
-        // Dispatch custom event to process multi-payment queue immediately
         $this->eventManager->dispatch('vindi_vp_process_multi_payment_queue', [
             'order' => $order,
             'queue_data' => $queueData
@@ -412,7 +392,6 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
      */
     private function buildPixRequestData($order, $payment, float $amountPix): array
     {
-        // Generate secondary transaction ID for PIX (increment_id-02)
         $pixOrderNumber = $order->getIncrementId() . '-02';
 
         return [
@@ -423,8 +402,8 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
                 'customer_ip' => $order->getRemoteIp() ?: '127.0.0.1',
                 'order_number' => $pixOrderNumber,
                 'shipping_type' => $order->getShippingDescription() ?: 'SEM_FRETE',
-                'shipping_price' => '0', // PIX portion shipping will be calculated proportionally
-                'price_discount' => '0', // PIX portion discount will be calculated proportionally
+                'shipping_price' => '0',
+                'price_discount' => '0',
                 'price_additional' => '0',
                 'url_notification' => $this->helper->getPaymentsNotificationUrl($order),
                 'free' => 'MAGENTO_API_' . $this->helper->getModuleVersion()
@@ -449,7 +428,6 @@ class TransactionRequest extends PaymentsRequest implements BuilderInterface
         $items = [];
         $quoteItems = $order->getAllItems();
         
-        // Calculate proportion for PIX amount
         $proportion = 1.0;
         if ($order->getBaseSubtotal() > 0) {
             $proportion = $pixAmount / $order->getBaseSubtotal();

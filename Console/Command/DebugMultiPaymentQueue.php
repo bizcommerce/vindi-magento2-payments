@@ -124,9 +124,7 @@ class DebugMultiPaymentQueue extends Command
      */
     private function debugSpecificItem(string $queueId, OutputInterface $output): void
     {
-        // Implementation would load specific item and show detailed info
         $output->writeln("<info>Debugging queue item ID: {$queueId}</info>");
-        // TODO: Load item and show details
     }
 
     /**
@@ -142,9 +140,7 @@ class DebugMultiPaymentQueue extends Command
         if ($status === 'pending') {
             $items = $this->queueService->getPendingItems($limit);
         } else {
-            // Get all items and filter
-            $items = $this->queueService->getPendingItems(1000); // Large number to get all
-            // TODO: Add proper filtering logic
+            $items = $this->queueService->getPendingItems(1000);
         }
 
         if (empty($items)) {
@@ -186,18 +182,15 @@ class DebugMultiPaymentQueue extends Command
             $output->writeln(sprintf('<error>Error Message:</error> %s', $item->getErrorMessage()));
         }
 
-        // Show request data summary
         $requestData = $item->getRequestData();
         if (!empty($requestData)) {
             $output->writeln('<info>Request Data Keys:</info> ' . implode(', ', array_keys($requestData)));
         }
 
-        // Show response data summary
         $responseData = $item->getResponseData();
         if (!empty($responseData)) {
             $output->writeln('<info>Response Data Keys:</info> ' . implode(', ', array_keys($responseData)));
             
-            // Show specific indicators based on method type
             switch ($item->getSecondaryMethodType()) {
                 case MultiPaymentQueue::SECONDARY_METHOD_PIX:
                     $output->writeln(sprintf('<info>PIX Code Present:</info> %s', 
@@ -214,7 +207,6 @@ class DebugMultiPaymentQueue extends Command
                     break;
             }
 
-            // Show status information
             $statusId = $responseData['transaction']['status_id'] ?? $responseData['status_id'] ?? 'N/A';
             $output->writeln(sprintf('<info>Response Status ID:</info> %s', $statusId));
         }
