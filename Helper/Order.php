@@ -259,21 +259,42 @@ class Order extends \Magento\Payment\Helper\Data
      */
     public function cancelOrder(SalesOrder $order, float $amount, bool $callback = false): SalesOrder
     {
-        if ($order->canCreditmemo()) {
-            $creditMemo = $this->creditmemoFactory->createByOrder($order);
-            $this->creditmemoService->refund($creditMemo, true);
-        } elseif ($order->canCancel()) {
-            $order->cancel();
+        try {
+            if ($order->canCreditmemo()) {
+                $creditMemo = $this->creditmemoFactory->createByOrder($order);
+                $this->creditmemoService->refund($creditMemo, true);
+            } elseif ($order->canCancel()) {
+                $order->cancel();
+            }
+
+            // Ensure order is properly cancelled
+            if ($order->getState() !== SalesOrder::STATE_CANCELED) {
+                $order->setState(SalesOrder::STATE_CANCELED);
+            }
+
+            $cancelledStatus = $this->helperData->getConfig(
+                'cancelled_order_status',
+                $order->getPayment()->getMethod(),
+                'payment',
+                $order->getStoreId()
+            );
+
+            // Set the configured cancelled status or default to 'canceled'
+            $finalStatus = $cancelledStatus ?: 'canceled';
+            $order->setStatus($finalStatus);
+
+            $order->addCommentToStatusHistory('The order ' . $order->getIncrementId() . ' was cancelled. Amount of ' . $amount);
+            
+            $this->helperData->log('Order ' . $order->getIncrementId() . ' cancelled with status: ' . $finalStatus);
+
+        } catch (\Exception $e) {
+            $this->helperData->log('Error cancelling order ' . $order->getIncrementId() . ': ' . $e->getMessage());
+            
+            // Force cancellation as fallback
+            $order->setState(SalesOrder::STATE_CANCELED);
+            $order->setStatus('canceled');
+            $order->addCommentToStatusHistory('Order force cancelled due to error: ' . $e->getMessage());
         }
-
-        $cancelledStatus = $this->helperData->getConfig(
-            'cancelled_order_status',
-            $order->getPayment()->getMethod(),
-            'payment',
-            $order->getStoreId()
-        ) ?: false;
-
-        $order->addCommentToStatusHistory(__('The order %1 was cancelled. Amount of %2', $cancelledStatus, $amount));
 
         return $order;
     }
@@ -295,7 +316,7 @@ class Order extends \Magento\Payment\Helper\Data
 
         $totalRefunded = (float)$order->getTotalRefunded() + $amount;
         $order->setTotalRefunded($totalRefunded);
-        $order->addCommentToStatusHistory(__('The order had the amount refunded by Vindi. Amount of %1', $amount));
+        $order->addCommentToStatusHistory('The order had the amount refunded by Vindi. Amount of ' . $amount);
 
         return $order;
     }
@@ -407,7 +428,7 @@ class Order extends \Magento\Payment\Helper\Data
                 $payment->setAdditionalInformation('multi_payment_url', $paymentResponse['url_payment']);
             }
         } catch (\Exception $e) {
-            $this->_logger->warning($e->getMessage());
+            $this->helperData->log($e->getMessage());
         }
 
         return $payment;
@@ -429,7 +450,7 @@ class Order extends \Magento\Payment\Helper\Data
                 $payment->setAdditionalInformation('bank_slip_number', $paymentResponse['linha_digitavel']);
             }
         } catch (\Exception $e) {
-            $this->_logger->warning($e->getMessage());
+            $this->helperData->log($e->getMessage());
         }
 
         return $payment;
@@ -455,7 +476,7 @@ class Order extends \Magento\Payment\Helper\Data
 
             $payment->setIsTransactionClosed(false);
         } catch (\Exception $e) {
-            $this->_logger->warning($e->getMessage());
+            $this->helperData->log($e->getMessage());
         }
 
         return $payment;

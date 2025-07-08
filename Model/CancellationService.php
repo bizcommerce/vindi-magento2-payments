@@ -301,22 +301,166 @@ class CancellationService
     private function cancelMagentoOrder(Order $order, string $reason): void
     {
         try {
+            // First cancel/refund all paid invoices
+            $this->cancelOrderInvoices($order, $reason);
+            
+            // Then cancel the order
             $this->helperOrder->cancelOrder($order, (float)$order->getGrandTotal(), true);
-            $order->addCommentToStatusHistory("Order cancelled: {$reason}");
-            $order->save();
+            
+            // Force set proper status and state if needed
+            $this->ensureOrderCancellation($order, $reason);
 
             $this->logger->execute('Order cancelled in Magento - Order ID: ' . $order->getIncrementId() . ', Reason: ' . $reason, 'vindi-cancellation');
 
         } catch (\Exception $e) {
             $this->logger->execute('Failed to cancel order in Magento - Order ID: ' . $order->getIncrementId() . ', Error: ' . $e->getMessage(), 'vindi-cancellation');
 
-            try {
-                $order->setState('canceled');
-                $order->setStatus('canceled');
-                $order->addCommentToStatusHistory("Order force cancelled: {$reason} (direct status change)");
-                $order->save();
-            } catch (\Exception $e2) {
+            // Force cancellation as fallback
+            $this->forceOrderCancellation($order, $reason);
+        }
+    }
+
+    /**
+     * Cancel all paid invoices for the order
+     *
+     * @param Order $order
+     * @param string $reason
+     * @return void
+     */
+    private function cancelOrderInvoices(Order $order, string $reason): void
+    {
+        try {
+            $invoices = $order->getInvoiceCollection();
+            
+            foreach ($invoices as $invoice) {
+                /** @var \Magento\Sales\Model\Order\Invoice $invoice */
+                if ($invoice->getState() == \Magento\Sales\Model\Order\Invoice::STATE_PAID) {
+                    $this->logger->execute('Cancelling paid invoice ' . $invoice->getIncrementId() . ' for order ' . $order->getIncrementId(), 'vindi-cancellation');
+                    
+                    try {
+                        // Try to create credit memo first
+                        if ($invoice->canRefund()) {
+                            $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+                            $creditmemoFactory = $objectManager->get(\Magento\Sales\Model\Order\CreditmemoFactory::class);
+                            $creditmemoService = $objectManager->get(\Magento\Sales\Model\Service\CreditmemoService::class);
+
+                            $creditmemo = $creditmemoFactory->createByInvoice($invoice);
+                            $creditmemoService->refund($creditmemo);
+                            
+                            $this->logger->execute('Credit memo created for invoice ' . $invoice->getIncrementId(), 'vindi-cancellation');
+                        } else {
+                            // Force cancel the invoice if can't refund
+                            $invoice->cancel();
+                            
+                            $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+                            $invoiceRepository = $objectManager->get(\Magento\Sales\Api\InvoiceRepositoryInterface::class);
+                            $invoiceRepository->save($invoice);
+                            
+                            $this->logger->execute('Invoice ' . $invoice->getIncrementId() . ' force cancelled', 'vindi-cancellation');
+                        }
+                    } catch (\Exception $invoiceException) {
+                        $this->logger->execute('Failed to cancel invoice ' . $invoice->getIncrementId() . ': ' . $invoiceException->getMessage(), 'vindi-cancellation');
+                        
+                        // Force update invoice state as last resort
+                        try {
+                            $invoice->setState(\Magento\Sales\Model\Order\Invoice::STATE_CANCELED);
+                            $invoice->addComment("Invoice cancelled due to payment cancellation: {$reason}");
+                            
+                            $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+                            $invoiceRepository = $objectManager->get(\Magento\Sales\Api\InvoiceRepositoryInterface::class);
+                            $invoiceRepository->save($invoice);
+                            
+                            $this->logger->execute('Invoice ' . $invoice->getIncrementId() . ' state forced to cancelled', 'vindi-cancellation');
+                        } catch (\Exception $forceException) {
+                            $this->logger->execute('Failed to force cancel invoice ' . $invoice->getIncrementId() . ': ' . $forceException->getMessage(), 'vindi-cancellation');
+                        }
+                    }
+                }
             }
+        } catch (\Exception $e) {
+            $this->logger->execute('Error cancelling invoices for order ' . $order->getIncrementId() . ': ' . $e->getMessage(), 'vindi-cancellation');
+        }
+    }
+
+    /**
+     * Ensure order is properly cancelled
+     *
+     * @param Order $order
+     * @param string $reason
+     * @return void
+     */
+    private function ensureOrderCancellation(Order $order, string $reason): void
+    {
+        try {
+            // Check if order is actually cancelled
+            if ($order->getState() !== \Magento\Sales\Model\Order::STATE_CANCELED) {
+                $this->logger->execute('Order ' . $order->getIncrementId() . ' not properly cancelled, forcing cancellation', 'vindi-cancellation');
+                
+                $order->setState(\Magento\Sales\Model\Order::STATE_CANCELED);
+                $order->setStatus('canceled');
+            }
+
+            // Get cancelled status from configuration
+            $cancelledStatus = $this->helperData->getConfig(
+                'cancelled_order_status',
+                $order->getPayment()->getMethod(),
+                'payment',
+                $order->getStoreId()
+            );
+            
+            if ($cancelledStatus && $order->getStatus() !== $cancelledStatus) {
+                $order->setStatus($cancelledStatus);
+                $this->logger->execute('Order ' . $order->getIncrementId() . ' status set to configured cancelled status: ' . $cancelledStatus, 'vindi-cancellation');
+            }
+
+            $order->addCommentToStatusHistory("Order cancelled: {$reason}");
+            $order->save();
+            
+        } catch (\Exception $e) {
+            $this->logger->execute('Failed to ensure order cancellation for ' . $order->getIncrementId() . ': ' . $e->getMessage(), 'vindi-cancellation');
+            throw $e;
+        }
+    }
+
+    /**
+     * Force order cancellation as fallback
+     *
+     * @param Order $order
+     * @param string $reason
+     * @return void
+     */
+    private function forceOrderCancellation(Order $order, string $reason): void
+    {
+        try {
+            $this->logger->execute('Force cancelling order ' . $order->getIncrementId(), 'vindi-cancellation');
+            
+            // Force cancel all invoices first
+            $invoices = $order->getInvoiceCollection();
+            foreach ($invoices as $invoice) {
+                try {
+                    if ($invoice->getState() !== \Magento\Sales\Model\Order\Invoice::STATE_CANCELED) {
+                        $invoice->setState(\Magento\Sales\Model\Order\Invoice::STATE_CANCELED);
+                        $invoice->addComment("Invoice force cancelled: {$reason}");
+                        
+                        $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+                        $invoiceRepository = $objectManager->get(\Magento\Sales\Api\InvoiceRepositoryInterface::class);
+                        $invoiceRepository->save($invoice);
+                    }
+                } catch (\Exception $invoiceException) {
+                    $this->logger->execute('Failed to force cancel invoice ' . $invoice->getIncrementId() . ': ' . $invoiceException->getMessage(), 'vindi-cancellation');
+                }
+            }
+            
+            // Force set order state and status
+            $order->setState(\Magento\Sales\Model\Order::STATE_CANCELED);
+            $order->setStatus('canceled');
+            $order->addCommentToStatusHistory("Order force cancelled: {$reason} (direct status change)");
+            $order->save();
+            
+            $this->logger->execute('Order ' . $order->getIncrementId() . ' force cancelled successfully', 'vindi-cancellation');
+            
+        } catch (\Exception $e2) {
+            $this->logger->execute('Failed to force cancel order ' . $order->getIncrementId() . ': ' . $e2->getMessage(), 'vindi-cancellation');
         }
     }
 

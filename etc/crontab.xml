@@ -9,7 +9,7 @@
             <schedule>30 6 * * *</schedule>
         </job>
         <job name="vindi_vp_process_callback_queue" instance="Vindi\VP\Cron\ProcessCallbackQueue" method="execute">
-            <schedule>*/3 * * * *</schedule>
+            <schedule>* * * * *</schedule>
         </job>
         <job name="vindi_vp_process_pix_queue" instance="Vindi\VP\Cron\ProcessPixQueue" method="execute">
             <schedule>*/2 * * * *</schedule>
