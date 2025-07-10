@@ -84,6 +84,10 @@ define(
                 showPixError: ko.observable(false),
                 cardErrorMessage: ko.observable(''),
                 pixErrorMessage: ko.observable(''),
+                showPercentageErrorCard: ko.observable(false),
+                showPercentageErrorPix: ko.observable(false),
+                percentageErrorCard: ko.observable(''),
+                percentageErrorPix: ko.observable(''),
                 isFormValid: ko.observable(true),
                 isLoadingInstallments: ko.observable(false),
                 isPlaceOrderActionAllowed: ko.observable(true)
@@ -111,6 +115,10 @@ define(
                     'showPixError',
                     'cardErrorMessage',
                     'pixErrorMessage',
+                    'showPercentageErrorCard',
+                    'showPercentageErrorPix',
+                    'percentageErrorCard',
+                    'percentageErrorPix',
                     'isFormValid',
                     'isLoadingInstallments',
                     'isPlaceOrderActionAllowed'
@@ -167,8 +175,11 @@ define(
                     var grandTotal = self.getGrandTotal();
                     var cardAmount = parseFloat($(this).val() || 0);
 
+                    // Reset all error states
                     self.showCardError(false);
+                    self.showPercentageErrorCard(false);
                     self.cardErrorMessage('');
+                    self.percentageErrorCard('');
                     $(this).removeClass('error');
                     self.isFormValid(true);
 
@@ -181,11 +192,55 @@ define(
                         return;
                     }
 
+                    // Validate negative values
+                    if (cardAmount < 0) {
+                        self.showCardError(true);
+                        self.cardErrorMessage($t('Valor inválido'));
+                        $(this).addClass('error');
+                        self.isFormValid(false);
+                        return;
+                    }
+
+                    // Validate decimal places
+                    var cardAmountStr = $(this).val();
+                    if (cardAmountStr && cardAmountStr.includes(',') && cardAmountStr.split(',')[1] && cardAmountStr.split(',')[1].length > 2) {
+                        self.showCardError(true);
+                        self.cardErrorMessage($t('Casas decimais excedem duas posições.'));
+                        $(this).addClass('error');
+                        self.isFormValid(false);
+                        return;
+                    }
+
                     if (cardAmount > 0) {
+                        // Validate percentage rule (5% minimum)
+                        var percentageValidation = self.validatePercentage(cardAmount, grandTotal, 'cartão');
+                        if (!percentageValidation.valid) {
+                            self.showPercentageErrorCard(true);
+                            self.percentageErrorCard(percentageValidation.detailedMessage);
+                            $(this).addClass('error');
+                            self.isFormValid(false);
+                            return;
+                        }
+
                         var remainingAmount = grandTotal - cardAmount;
-                        $('#pix_amount').val(remainingAmount.toFixed(2)).prop('disabled', true);
+                        
+                        // Validate if remaining amount for PIX meets 5% rule
+                        if (remainingAmount > 0) {
+                            var pixPercentageValidation = self.validatePercentage(remainingAmount, grandTotal, 'PIX');
+                            if (!pixPercentageValidation.valid) {
+                                self.showPercentageErrorCard(true);
+                                self.percentageErrorCard(pixPercentageValidation.detailedMessage);
+                                $(this).addClass('error');
+                                self.isFormValid(false);
+                                return;
+                            }
+                        }
+
+                        $('#pix_amount').val(remainingAmount.toFixed(2).replace('.', ',')).prop('disabled', true);
                         self.showPixError(false);
+                        self.showPercentageErrorPix(false);
                         self.pixErrorMessage('');
+                        self.percentageErrorPix('');
                         $('#pix_amount').removeClass('error');
 
                         // Update installments when card amount changes
@@ -198,9 +253,15 @@ define(
                     if (!$(this).val() || $(this).val() === '') {
                         $('#pix_amount').val('').prop('disabled', false);
                         self.showCardError(false);
+                        self.showPercentageErrorCard(false);
                         self.cardErrorMessage('');
+                        self.percentageErrorCard('');
                         $(this).removeClass('error');
                         $('#pix_amount').removeClass('error');
+                        self.showPixError(false);
+                        self.showPercentageErrorPix(false);
+                        self.pixErrorMessage('');
+                        self.percentageErrorPix('');
                         self.isFormValid(true);
                         // Update installments when card amount is cleared
                         self.updateInstallmentsValues();
@@ -210,10 +271,13 @@ define(
                 // Handle pix amount change
                 $(document).on('change', '#pix_amount', function() {
                     var grandTotal = self.getGrandTotal();
-                    var pixAmount = parseFloat($(this).val() || 0);
+                    var pixAmount = parseFloat($(this).val().replace(',', '.') || 0);
 
+                    // Reset all error states
                     self.showPixError(false);
+                    self.showPercentageErrorPix(false);
                     self.pixErrorMessage('');
+                    self.percentageErrorPix('');
                     $(this).removeClass('error');
                     self.isFormValid(true);
 
@@ -226,11 +290,55 @@ define(
                         return;
                     }
 
+                    // Validate negative values
+                    if (pixAmount < 0) {
+                        self.showPixError(true);
+                        self.pixErrorMessage($t('Valor inválido'));
+                        $(this).addClass('error');
+                        self.isFormValid(false);
+                        return;
+                    }
+
+                    // Validate decimal places
+                    var pixAmountStr = $(this).val();
+                    if (pixAmountStr && pixAmountStr.includes(',') && pixAmountStr.split(',')[1] && pixAmountStr.split(',')[1].length > 2) {
+                        self.showPixError(true);
+                        self.pixErrorMessage($t('Casas decimais excedem duas posições.'));
+                        $(this).addClass('error');
+                        self.isFormValid(false);
+                        return;
+                    }
+
                     if (pixAmount > 0) {
+                        // Validate percentage rule (5% minimum)
+                        var percentageValidation = self.validatePercentage(pixAmount, grandTotal, 'PIX');
+                        if (!percentageValidation.valid) {
+                            self.showPercentageErrorPix(true);
+                            self.percentageErrorPix(percentageValidation.detailedMessage);
+                            $(this).addClass('error');
+                            self.isFormValid(false);
+                            return;
+                        }
+
                         var remainingAmount = grandTotal - pixAmount;
-                        $('#card_amount').val(remainingAmount.toFixed(2)).prop('disabled', true);
+                        
+                        // Validate if remaining amount for card meets 5% rule
+                        if (remainingAmount > 0) {
+                            var cardPercentageValidation = self.validatePercentage(remainingAmount, grandTotal, 'cartão');
+                            if (!cardPercentageValidation.valid) {
+                                self.showPercentageErrorPix(true);
+                                self.percentageErrorPix(cardPercentageValidation.detailedMessage);
+                                $(this).addClass('error');
+                                self.isFormValid(false);
+                                return;
+                            }
+                        }
+
+                        $('#card_amount').val(remainingAmount.toFixed(2).replace('.', ',')).prop('disabled', true);
                         self.showCardError(false);
+                        self.showPercentageErrorCard(false);
                         self.cardErrorMessage('');
+                        self.percentageErrorCard('');
                         $('#card_amount').removeClass('error');
 
                         // Update installments when pix amount changes (affecting card amount)
@@ -243,12 +351,55 @@ define(
                     if (!$(this).val() || $(this).val() === '') {
                         $('#card_amount').val('').prop('disabled', false);
                         self.showPixError(false);
+                        self.showPercentageErrorPix(false);
                         self.pixErrorMessage('');
+                        self.percentageErrorPix('');
                         $(this).removeClass('error');
                         $('#card_amount').removeClass('error');
+                        self.showCardError(false);
+                        self.showPercentageErrorCard(false);
+                        self.cardErrorMessage('');
+                        self.percentageErrorCard('');
                         self.isFormValid(true);
                         // Update installments when pix amount is cleared
                         self.updateInstallmentsValues();
+                    }
+                });
+
+                // Add blur validation for real-time feedback
+                $(document).on('blur', '#card_amount, #pix_amount', function() {
+                    var fieldId = $(this).attr('id');
+                    var amount = parseFloat($(this).val().replace(',', '.') || 0);
+                    var grandTotal = self.getGrandTotal();
+                    var isCardField = fieldId === 'card_amount';
+
+                    if (amount > 0) {
+                        // Validate percentage rule
+                        var methodName = isCardField ? 'cartão' : 'PIX';
+                        var percentageValidation = self.validatePercentage(amount, grandTotal, methodName);
+                        
+                        if (!percentageValidation.valid) {
+                            if (isCardField) {
+                                self.showPercentageErrorCard(true);
+                                self.percentageErrorCard(percentageValidation.detailedMessage);
+                            } else {
+                                self.showPercentageErrorPix(true);
+                                self.percentageErrorPix(percentageValidation.detailedMessage);
+                            }
+                            $(this).addClass('error');
+                            self.isFormValid(false);
+                            return;
+                        }
+
+                        // Clear percentage errors if validation passes
+                        if (isCardField) {
+                            self.showPercentageErrorCard(false);
+                            self.percentageErrorCard('');
+                        } else {
+                            self.showPercentageErrorPix(false);
+                            self.percentageErrorPix('');
+                        }
+                        $(this).removeClass('error');
                     }
                 });
 
@@ -434,6 +585,39 @@ define(
             },
 
             /**
+             * Validate percentage rule (minimum 5% per method)
+             * @param {number} amount
+             * @param {number} total
+             * @param {string} methodName
+             * @returns {Object}
+             */
+            validatePercentage: function(amount, total, methodName) {
+                var percentage = (amount / total) * 100;
+                var minPercentage = 5;
+                var maxPercentage = 95;
+                var minAmount = (total * minPercentage) / 100;
+                var maxAmount = (total * maxPercentage) / 100;
+
+                if (amount > 0 && percentage < minPercentage) {
+                    return {
+                        valid: false,
+                        message: $t('Para usar multi-métodos, cada método deve ter pelo menos 5% do valor total'),
+                        detailedMessage: $t('Valor muito baixo. O mínimo é 5% do total (R$ %1)').replace('%1', minAmount.toFixed(2).replace('.', ','))
+                    };
+                }
+
+                if (amount > maxAmount) {
+                    return {
+                        valid: false,
+                        message: $t('Para usar multi-métodos, cada método deve ter pelo menos 5% do valor total'),
+                        detailedMessage: $t('Valor muito alto. O máximo é 95% do total (R$ %1)').replace('%1', maxAmount.toFixed(2).replace('.', ','))
+                    };
+                }
+
+                return { valid: true };
+            },
+
+            /**
              * Validate form
              * @returns {boolean}
              */
@@ -444,16 +628,54 @@ define(
                     var $form = $('#' + 'form_' + this.getCode());
 
                     // Validate card and pix amounts
-                    var cardAmount = parseFloat($('#card_amount').val() || 0);
-                    var pixAmount = parseFloat($('#pix_amount').val() || 0);
+                    var cardAmount = parseFloat($('#card_amount').val().replace(',', '.') || 0);
+                    var pixAmount = parseFloat($('#pix_amount').val().replace(',', '.') || 0);
                     var grandTotal = this.getGrandTotal();
 
                     // Reset error states
                     this.showCardError(false);
                     this.showPixError(false);
+                    this.showPercentageErrorCard(false);
+                    this.showPercentageErrorPix(false);
                     $('#card_amount').removeClass('error');
                     $('#pix_amount').removeClass('error');
                     this.isFormValid(true);
+
+                    // Validate negative values
+                    if (cardAmount < 0) {
+                        this.showCardError(true);
+                        this.cardErrorMessage($t('Valor inválido'));
+                        $('#card_amount').addClass('error');
+                        this.isFormValid(false);
+                        return false;
+                    }
+
+                    if (pixAmount < 0) {
+                        this.showPixError(true);
+                        this.pixErrorMessage($t('Valor inválido'));
+                        $('#pix_amount').addClass('error');
+                        this.isFormValid(false);
+                        return false;
+                    }
+
+                    // Validate decimal places
+                    var cardAmountStr = $('#card_amount').val();
+                    if (cardAmountStr && cardAmountStr.includes(',') && cardAmountStr.split(',')[1] && cardAmountStr.split(',')[1].length > 2) {
+                        this.showCardError(true);
+                        this.cardErrorMessage($t('Casas decimais excedem duas posições.'));
+                        $('#card_amount').addClass('error');
+                        this.isFormValid(false);
+                        return false;
+                    }
+
+                    var pixAmountStr = $('#pix_amount').val();
+                    if (pixAmountStr && pixAmountStr.includes(',') && pixAmountStr.split(',')[1] && pixAmountStr.split(',')[1].length > 2) {
+                        this.showPixError(true);
+                        this.pixErrorMessage($t('Casas decimais excedem duas posições.'));
+                        $('#pix_amount').addClass('error');
+                        this.isFormValid(false);
+                        return false;
+                    }
 
                     // Validate card amount
                     if (cardAmount > grandTotal) {
@@ -492,6 +714,44 @@ define(
                         $('#card_amount').addClass('error');
                         this.isFormValid(false);
                         return false;
+                    }
+
+                    // Validate percentage rule (5% minimum for each method)
+                    if (cardAmount > 0) {
+                        var cardPercentageValidation = this.validatePercentage(cardAmount, grandTotal, 'cartão');
+                        if (!cardPercentageValidation.valid) {
+                            this.showPercentageErrorCard(true);
+                            this.percentageErrorCard(cardPercentageValidation.detailedMessage);
+                            $('#card_amount').addClass('error');
+                            this.isFormValid(false);
+                            return false;
+                        }
+                    }
+
+                    if (pixAmount > 0) {
+                        var pixPercentageValidation = this.validatePercentage(pixAmount, grandTotal, 'PIX');
+                        if (!pixPercentageValidation.valid) {
+                            this.showPercentageErrorPix(true);
+                            this.percentageErrorPix(pixPercentageValidation.detailedMessage);
+                            $('#pix_amount').addClass('error');
+                            this.isFormValid(false);
+                            return false;
+                        }
+                    }
+
+                    // Validate installments match card amount
+                    if (cardAmount > 0 && this.creditCardInstallments()) {
+                        var selectedInstallment = this.installments().find(function(inst) {
+                            return inst.installments == self.creditCardInstallments();
+                        });
+                        
+                        if (selectedInstallment && Math.abs(selectedInstallment.amount - cardAmount) > 0.01) {
+                            this.showCardError(true);
+                            this.cardErrorMessage($t('Valor das parcelas não corresponde ao valor selecionado para o cartão.'));
+                            $('#card_amount').addClass('error');
+                            this.isFormValid(false);
+                            return false;
+                        }
                     }
 
                     // Handle manual form validation instead of using jQuery validation plugin

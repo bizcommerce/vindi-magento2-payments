@@ -67,6 +67,10 @@
                         <div class="field-error" data-bind="visible: showCardError">
                             <span data-bind="text: cardErrorMessage"></span>
                         </div>
+                        <!-- Error message for card percentage -->
+                        <div class="field-error" data-bind="visible: showPercentageErrorCard">
+                            <span data-bind="text: percentageErrorCard"></span>
+                        </div>
                     </div>
 
                     <!-- existing credit‐card fields -->
@@ -275,6 +279,10 @@
                         <!-- Error message for pix amount -->
                         <div class="field-error" data-bind="visible: showPixError">
                             <span data-bind="text: pixErrorMessage"></span>
+                        </div>
+                        <!-- Error message for pix percentage -->
+                        <div class="field-error" data-bind="visible: showPercentageErrorPix">
+                            <span data-bind="text: percentageErrorPix"></span>
                         </div>
                     </div>
                     <div class="field">
