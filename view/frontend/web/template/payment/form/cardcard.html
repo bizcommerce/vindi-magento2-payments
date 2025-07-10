@@ -66,6 +66,10 @@
                         <div class="field-error" data-bind="visible: showFirstCardError">
                             <span data-bind="text: firstCardErrorMessage"></span>
                         </div>
+                        <!-- Error message for percentage validation -->
+                        <div class="field-error" data-bind="visible: showFirstPercentageError">
+                            <span data-bind="text: firstPercentageErrorMessage"></span>
+                        </div>
                     </div>
 
                     <!-- existing credit‐card fields -->
@@ -274,6 +278,10 @@
                         <!-- Error message for card amount -->
                         <div class="field-error" data-bind="visible: showSecondCardError">
                             <span data-bind="text: secondCardErrorMessage"></span>
+                        </div>
+                        <!-- Error message for percentage validation -->
+                        <div class="field-error" data-bind="visible: showSecondPercentageError">
+                            <span data-bind="text: secondPercentageErrorMessage"></span>
                         </div>
                     </div>
 

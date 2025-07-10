@@ -96,6 +96,10 @@ define(
                 showSecondCardError: ko.observable(false),
                 firstCardErrorMessage: ko.observable(''),
                 secondCardErrorMessage: ko.observable(''),
+                showFirstPercentageError: ko.observable(false),
+                showSecondPercentageError: ko.observable(false),
+                firstPercentageErrorMessage: ko.observable(''),
+                secondPercentageErrorMessage: ko.observable(''),
                 isFormValid: ko.observable(true),
                 isLoadingInstallments: ko.observable(false),
                 isLoadingSecondInstallments: ko.observable(false)
@@ -133,6 +137,10 @@ define(
                     'showSecondCardError',
                     'firstCardErrorMessage',
                     'secondCardErrorMessage',
+                    'showFirstPercentageError',
+                    'showSecondPercentageError',
+                    'firstPercentageErrorMessage',
+                    'secondPercentageErrorMessage',
                     'isFormValid',
                     'isLoadingInstallments',
                     'isLoadingSecondInstallments'
@@ -244,7 +252,23 @@ define(
                     var $first = $('#first_card_amount');
                     var $second = $('#second_card_amount');
                     var firstVal = parseFloat($first.val().replace(',', '.') || 0);
+                    
+                    // Reset error states
+                    self.showFirstCardError(false);
+                    self.showFirstPercentageError(false);
+                    $first.removeClass('error');
+                    
                     if (firstVal > 0 && firstVal <= grandTotal) {
+                        // Validate percentage rule
+                        var validation = self.validatePercentage(firstVal, grandTotal);
+                        if (!validation.valid) {
+                            self.showFirstPercentageError(true);
+                            self.firstPercentageErrorMessage(validation.message);
+                            $first.addClass('error');
+                            self.isFormValid(false);
+                            return;
+                        }
+                        
                         var remaining = Math.max(0, grandTotal - firstVal);
                         $second.val(remaining.toFixed(2));
                         $second.prop('disabled', true);
@@ -267,7 +291,23 @@ define(
                     var $second = $('#second_card_amount');
                     var $first = $('#first_card_amount');
                     var secondVal = parseFloat($second.val().replace(',', '.') || 0);
+                    
+                    // Reset error states
+                    self.showSecondCardError(false);
+                    self.showSecondPercentageError(false);
+                    $second.removeClass('error');
+                    
                     if (secondVal > 0 && secondVal <= grandTotal) {
+                        // Validate percentage rule
+                        var validation = self.validatePercentage(secondVal, grandTotal);
+                        if (!validation.valid) {
+                            self.showSecondPercentageError(true);
+                            self.secondPercentageErrorMessage(validation.message);
+                            $second.addClass('error');
+                            self.isFormValid(false);
+                            return;
+                        }
+                        
                         var remaining = Math.max(0, grandTotal - secondVal);
                         $first.val(remaining.toFixed(2));
                         $first.prop('disabled', true);
@@ -288,6 +328,8 @@ define(
                  * Dual Card Installments Manager - Gerencia parcelas de forma unificada
                  */
                 this.DualCardInstallmentManager = {
+                    // Referência ao componente principal
+                    parent: self,
                     // Estado centralizado
                     state: {
                         card1: { type: null, amount: 0, profile: null },
@@ -300,6 +342,19 @@ define(
                     updateCard: function(cardIndex, data) {
                         var self = this;
                         console.log('[DUAL_CARD_MANAGER] Atualizando cartão', cardIndex, ':', data);
+
+                        // Validate 5% rule before updating installments
+                        if (data.amount > 0) {
+                            var grandTotal = this.parent.getGrandTotal();
+                            if (grandTotal > 0) {
+                                var validation = this.parent.validatePercentage(data.amount, grandTotal);
+                                
+                                if (!validation.valid) {
+                                    console.warn('[DUAL_CARD_MANAGER] Valor inválido para parcelas:', validation.message);
+                                    return;
+                                }
+                            }
+                        }
 
                         this.state[`card${cardIndex}`] = Object.assign(this.state[`card${cardIndex}`], data);
 
@@ -506,14 +561,48 @@ define(
                 // Adicionar listeners apenas para os campos de valor dos cartões
                 $(document).off('change keyup blur', '#first_card_amount');
                 $(document).on('change keyup blur', '#first_card_amount', function() {
+                    var amount = parseFloat($(this).val().replace(',', '.')) || 0;
+                    var grandTotal = self.getGrandTotal();
+                    
+                    // Validate percentage on blur
+                    if (amount > 0 && grandTotal > 0) {
+                        var validation = self.validatePercentage(amount, grandTotal);
+                        if (!validation.valid) {
+                            self.showFirstPercentageError(true);
+                            self.firstPercentageErrorMessage(validation.message);
+                            $(this).addClass('error');
+                            self.isFormValid(false);
+                        } else {
+                            self.showFirstPercentageError(false);
+                            $(this).removeClass('error');
+                        }
+                    }
+                    
                     self.DualCardInstallmentManager.updateCard(1, {
-                        amount: parseFloat($(this).val().replace(',', '.')) || 0
+                        amount: amount
                     });
                 });
                 $(document).off('change keyup blur', '#second_card_amount');
                 $(document).on('change keyup blur', '#second_card_amount', function() {
+                    var amount = parseFloat($(this).val().replace(',', '.')) || 0;
+                    var grandTotal = self.getGrandTotal();
+                    
+                    // Validate percentage on blur
+                    if (amount > 0 && grandTotal > 0) {
+                        var validation = self.validatePercentage(amount, grandTotal);
+                        if (!validation.valid) {
+                            self.showSecondPercentageError(true);
+                            self.secondPercentageErrorMessage(validation.message);
+                            $(this).addClass('error');
+                            self.isFormValid(false);
+                        } else {
+                            self.showSecondPercentageError(false);
+                            $(this).removeClass('error');
+                        }
+                    }
+                    
                     self.DualCardInstallmentManager.updateCard(2, {
-                        amount: parseFloat($(this).val().replace(',', '.')) || 0
+                        amount: amount
                     });
                 });
 
@@ -886,6 +975,58 @@ define(
                         this.showFirstCardError(true);
                         this.firstCardErrorMessage($t('Pelo menos um método de pagamento deve ser selecionado.'));
                         $('#first_card_amount').addClass('error');
+                        this.isFormValid(false);
+                        return false;
+                    }
+
+                    // Validate 5% rule for both card amounts
+                    if (firstCardAmount > 0) {
+                        var firstCardValidation = this.validatePercentage(firstCardAmount, grandTotal);
+                        if (!firstCardValidation.valid) {
+                            this.showFirstPercentageError(true);
+                            this.firstPercentageErrorMessage(firstCardValidation.message);
+                            $('#first_card_amount').addClass('error');
+                            this.isFormValid(false);
+                            return false;
+                        }
+                    }
+                    
+                    if (secondCardAmount > 0) {
+                        var secondCardValidation = this.validatePercentage(secondCardAmount, grandTotal);
+                        if (!secondCardValidation.valid) {
+                            this.showSecondPercentageError(true);
+                            this.secondPercentageErrorMessage(secondCardValidation.message);
+                            $('#second_card_amount').addClass('error');
+                            this.isFormValid(false);
+                            return false;
+                        }
+                    }
+
+                    // Validate negative values
+                    if (firstCardAmount < 0 || secondCardAmount < 0) {
+                        this.showFirstCardError(true);
+                        this.firstCardErrorMessage($t('Valor inválido'));
+                        $('#first_card_amount').addClass('error');
+                        this.isFormValid(false);
+                        return false;
+                    }
+
+                    // Validate decimal places
+                    var firstCardAmountStr = $('#first_card_amount').val();
+                    var secondCardAmountStr = $('#second_card_amount').val();
+
+                    if (firstCardAmountStr && firstCardAmountStr.split(',')[1] && firstCardAmountStr.split(',')[1].length > 2) {
+                        this.showFirstCardError(true);
+                        this.firstCardErrorMessage($t('Casas decimais excedem duas posições.'));
+                        $('#first_card_amount').addClass('error');
+                        this.isFormValid(false);
+                        return false;
+                    }
+
+                    if (secondCardAmountStr && secondCardAmountStr.split(',')[1] && secondCardAmountStr.split(',')[1].length > 2) {
+                        this.showSecondCardError(true);
+                        this.secondCardErrorMessage($t('Casas decimais excedem duas posições.'));
+                        $('#second_card_amount').addClass('error');
                         this.isFormValid(false);
                         return false;
                     }
@@ -1610,6 +1751,37 @@ define(
             afterRender: function() {
                 var self = this;
                 self.initializeMasks();
+            },
+
+            /**
+             * Validate percentage rule (minimum 5% for each payment method)
+             * @param {number} amount - Amount to validate
+             * @param {number} total - Total order amount
+             * @returns {object} - Validation result with status and message
+             */
+            validatePercentage: function(amount, total) {
+                var percentage = (amount / total) * 100;
+                var minPercentage = 5;
+                var maxPercentage = 95;
+                
+                if (amount > 0 && percentage < minPercentage) {
+                    var minAmount = (total * 0.05).toFixed(2).replace('.', ',');
+                    return {
+                        valid: false,
+                        type: 'min',
+                        message: $t('Valor muito baixo. O mínimo é 5% do total (R$ %1)').replace('%1', minAmount)
+                    };
+                }
+                
+                if (percentage > maxPercentage) {
+                    return {
+                        valid: false,
+                        type: 'max',
+                        message: $t('Para usar multi-métodos, cada método deve ter pelo menos 5% do valor total')
+                    };
+                }
+                
+                return { valid: true };
             }
         });
     }
