@@ -79,6 +79,10 @@ define(
                 showBankslipError: ko.observable(false),
                 cardErrorMessage: ko.observable(''),
                 bankslipErrorMessage: ko.observable(''),
+                showPercentageErrorCard: ko.observable(false),
+                showPercentageErrorBankslip: ko.observable(false),
+                percentageErrorCard: ko.observable(''),
+                percentageErrorBankslip: ko.observable(''),
                 isFormValid: ko.observable(true),
                 isLoadingInstallments: ko.observable(false)
             },
@@ -105,6 +109,10 @@ define(
                     'showBankslipError',
                     'cardErrorMessage',
                     'bankslipErrorMessage',
+                    'showPercentageErrorCard',
+                    'showPercentageErrorBankslip',
+                    'percentageErrorCard',
+                    'percentageErrorBankslip',
                     'isFormValid',
                     'isLoadingInstallments'
                 ]);
@@ -159,8 +167,11 @@ define(
                     var grandTotal = self.getGrandTotal();
                     var cardAmount = parseFloat($(this).val() || 0);
 
+                    // Reset all error states
                     self.showCardError(false);
+                    self.showPercentageErrorCard(false);
                     self.cardErrorMessage('');
+                    self.percentageErrorCard('');
                     $(this).removeClass('error');
                     self.isFormValid(true);
 
@@ -173,12 +184,37 @@ define(
                         return;
                     }
 
+                    // Validate percentage rule (5% minimum) if amount > 0
                     if (cardAmount > 0) {
+                        var percentageValidation = self.validatePercentage(cardAmount, grandTotal);
+                        if (!percentageValidation.valid) {
+                            self.showPercentageErrorCard(true);
+                            self.percentageErrorCard(percentageValidation.detailedMessage);
+                            $(this).addClass('error');
+                            self.isFormValid(false);
+                            return;
+                        }
+
                         var remainingAmount = grandTotal - cardAmount;
                         remainingAmount = Math.round(remainingAmount * 100) / 100; // Arredonda para 2 casas decimais
+                        
+                        // Validate if remaining amount for bankslip meets 5% rule
+                        if (remainingAmount > 0) {
+                            var remainingValidation = self.validatePercentage(remainingAmount, grandTotal);
+                            if (!remainingValidation.valid) {
+                                self.showPercentageErrorCard(true);
+                                self.percentageErrorCard($t('Valor muito alto. O valor restante para bankslip seria muito baixo (mínimo 5%).'));
+                                $(this).addClass('error');
+                                self.isFormValid(false);
+                                return;
+                            }
+                        }
+
                         $('#bankslippix_bankslip_amount').val(remainingAmount.toFixed(2)).prop('disabled', true);
                         self.showBankslipError(false);
+                        self.showPercentageErrorBankslip(false);
                         self.bankslipErrorMessage('');
+                        self.percentageErrorBankslip('');
                         $('#bankslippix_bankslip_amount').removeClass('error');
 
                         // Update installments when card amount changes
@@ -191,7 +227,9 @@ define(
                     if (!$(this).val() || $(this).val() === '') {
                         $('#bankslippix_bankslip_amount').val('').prop('disabled', false);
                         self.showCardError(false);
+                        self.showPercentageErrorCard(false);
                         self.cardErrorMessage('');
+                        self.percentageErrorCard('');
                         $(this).removeClass('error');
                         $('#bankslippix_bankslip_amount').removeClass('error');
                         self.isFormValid(true);
@@ -205,8 +243,11 @@ define(
                     var grandTotal = self.getGrandTotal();
                     var bankslipAmount = parseFloat($(this).val() || 0);
 
+                    // Reset all error states
                     self.showBankslipError(false);
+                    self.showPercentageErrorBankslip(false);
                     self.bankslipErrorMessage('');
+                    self.percentageErrorBankslip('');
                     $(this).removeClass('error');
                     self.isFormValid(true);
 
@@ -219,12 +260,37 @@ define(
                         return;
                     }
 
+                    // Validate percentage rule (5% minimum) if amount > 0
                     if (bankslipAmount > 0) {
+                        var percentageValidation = self.validatePercentage(bankslipAmount, grandTotal);
+                        if (!percentageValidation.valid) {
+                            self.showPercentageErrorBankslip(true);
+                            self.percentageErrorBankslip(percentageValidation.detailedMessage);
+                            $(this).addClass('error');
+                            self.isFormValid(false);
+                            return;
+                        }
+
                         var remainingAmount = grandTotal - bankslipAmount;
                         remainingAmount = Math.round(remainingAmount * 100) / 100; // Arredonda para 2 casas decimais
+                        
+                        // Validate if remaining amount for card meets 5% rule
+                        if (remainingAmount > 0) {
+                            var remainingValidation = self.validatePercentage(remainingAmount, grandTotal);
+                            if (!remainingValidation.valid) {
+                                self.showPercentageErrorBankslip(true);
+                                self.percentageErrorBankslip($t('Valor muito alto. O valor restante para cartão seria muito baixo (mínimo 5%).'));
+                                $(this).addClass('error');
+                                self.isFormValid(false);
+                                return;
+                            }
+                        }
+
                         $('#bankslippix_card_amount').val(remainingAmount.toFixed(2)).prop('disabled', true);
                         self.showCardError(false);
+                        self.showPercentageErrorCard(false);
                         self.cardErrorMessage('');
+                        self.percentageErrorCard('');
                         $('#bankslippix_card_amount').removeClass('error');
 
                         // Update installments when bankslip amount changes (affecting card amount)
@@ -237,7 +303,9 @@ define(
                     if (!$(this).val() || $(this).val() === '') {
                         $('#bankslippix_card_amount').val('').prop('disabled', false);
                         self.showBankslipError(false);
+                        self.showPercentageErrorBankslip(false);
                         self.bankslipErrorMessage('');
+                        self.percentageErrorBankslip('');
                         $(this).removeClass('error');
                         $('#bankslippix_card_amount').removeClass('error');
                         self.isFormValid(true);
@@ -416,6 +484,40 @@ define(
              */
             isActive: function () {
                 return this.getCode() === this.isChecked();
+            },
+
+            /**
+             * Validate percentage rule (minimum 5% per method)
+             * @param {number} amount - Amount to validate
+             * @param {number} total - Total amount of the order
+             * @returns {object} - Validation result with valid flag and messages
+             */
+            validatePercentage: function(amount, total) {
+                var percentage = (amount / total) * 100;
+                var minAmount = (total * 0.05); // 5% minimum
+                var maxAmount = (total * 0.95); // 95% maximum
+                
+                if (amount > 0 && amount < minAmount) {
+                    return {
+                        valid: false,
+                        type: 'minimum',
+                        message: $t('Para usar multi-métodos, cada método deve ter pelo menos 5% do valor total'),
+                        detailedMessage: $t('Valor muito baixo. O mínimo é 5% do total (R$ %1)').replace('%1', minAmount.toFixed(2).replace('.', ','))
+                    };
+                }
+                
+                if (amount > maxAmount) {
+                    return {
+                        valid: false,
+                        type: 'maximum', 
+                        message: $t('Para usar multi-métodos, cada método deve ter pelo menos 5% do valor total'),
+                        detailedMessage: $t('Valor muito alto. O máximo é 95% do total (R$ %1)').replace('%1', maxAmount.toFixed(2).replace('.', ','))
+                    };
+                }
+                
+                return {
+                    valid: true
+                };
             },
 
             /**

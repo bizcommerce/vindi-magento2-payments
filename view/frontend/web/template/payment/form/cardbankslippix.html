@@ -67,6 +67,10 @@
                         <div class="field-error" data-bind="visible: showCardError">
                             <span data-bind="text: cardErrorMessage"></span>
                         </div>
+                        <!-- Error message for card percentage -->
+                        <div class="field-error" data-bind="visible: showPercentageErrorCard">
+                            <span data-bind="text: percentageErrorCard"></span>
+                        </div>
                     </div>
 
                     <!-- existing credit‐card fields -->
@@ -274,6 +278,10 @@
                         <!-- Error message for bankslip amount -->
                         <div class="field-error" data-bind="visible: showBankslipError">
                             <span data-bind="text: bankslipErrorMessage"></span>
+                        </div>
+                        <!-- Error message for bankslip percentage -->
+                        <div class="field-error" data-bind="visible: showPercentageErrorBankslip">
+                            <span data-bind="text: percentageErrorBankslip"></span>
                         </div>
                     </div>
                     <div class="field">
