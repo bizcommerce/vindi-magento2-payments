@@ -44,6 +44,22 @@ class Callback extends AbstractModel implements CallbackInterface
     }
 
     /**
+     * @inheritDoc
+     */
+    public function getEntityId()
+    {
+        return $this->getData(self::ENTITY_ID);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function setEntityId($entityId)
+    {
+        $this->setData(self::ENTITY_ID, $entityId);
+    }
+
+    /**
      * @ingeritdoc
      */
     public function getStatus()
@@ -137,6 +153,38 @@ class Callback extends AbstractModel implements CallbackInterface
     public function setUpdatedAt($updatedAt)
     {
         $this->setData(self::UPDATED_AT, $updatedAt);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getQueueStatus()
+    {
+        return $this->getData(self::QUEUE_STATUS);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function setQueueStatus($queueStatus)
+    {
+        $this->setData(self::QUEUE_STATUS, $queueStatus);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getAttempts()
+    {
+        return $this->getData(self::ATTEMPTS);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function setAttempts($attempts)
+    {
+        $this->setData(self::ATTEMPTS, $attempts);
     }
 
     /**

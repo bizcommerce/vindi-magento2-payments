@@ -49,9 +49,6 @@ class Payments extends \Vindi\VP\Controller\Callback
 
             if (isset($params['transaction'])) {
                 $orderNumber = $params['transaction']['order_number'] ?? ($params['transaction']['free'] ?? '');
-                if (preg_match('/(.*?)-(\d{2})$/', $orderNumber)) {
-                    $this->helperData->log('Multi-payment webhook detected in controller: ' . $orderNumber, self::LOG_NAME);
-                }
                 
                 $callBack = $this->callbackFactory->create();
                 $callBack->setStatus($params['transaction']['status_name'] ?? '');

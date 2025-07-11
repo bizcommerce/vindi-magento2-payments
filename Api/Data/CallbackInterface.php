@@ -31,6 +31,8 @@ interface CallbackInterface extends \Magento\Framework\Api\ExtensibleDataInterfa
     public const PAYLOAD = 'payload';
     public const CREATED_AT = 'created_at';
     public const UPDATED_AT = 'updated_at';
+    public const QUEUE_STATUS = 'queue_status';
+    public const ATTEMPTS = 'attempts';
 
     /**
      * Get EntityId.
@@ -122,6 +124,32 @@ interface CallbackInterface extends \Magento\Framework\Api\ExtensibleDataInterfa
      * @param $updatedAt
      */
     public function setUpdatedAt($updatedAt);
+
+    /**
+     * Get Queue Status.
+     *
+     * @return string
+     */
+    public function getQueueStatus();
+
+    /**
+     * Set Queue Status.
+     * @param $queueStatus
+     */
+    public function setQueueStatus($queueStatus);
+
+    /**
+     * Get Attempts.
+     *
+     * @return int
+     */
+    public function getAttempts();
+
+    /**
+     * Set Attempts.
+     * @param $attempts
+     */
+    public function setAttempts($attempts);
 
     /**
      * @return \Vindi\VP\Api\Data\CallbackExtensionInterface|null
