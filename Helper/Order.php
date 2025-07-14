@@ -267,7 +267,7 @@ class Order extends \Magento\Payment\Helper\Data
                 $order->cancel();
             }
 
-            // Ensure order is properly cancelled
+
             if ($order->getState() !== SalesOrder::STATE_CANCELED) {
                 $order->setState(SalesOrder::STATE_CANCELED);
             }
@@ -279,7 +279,7 @@ class Order extends \Magento\Payment\Helper\Data
                 $order->getStoreId()
             );
 
-            // Set the configured cancelled status or default to 'canceled'
+
             $finalStatus = $cancelledStatus ?: 'canceled';
             $order->setStatus($finalStatus);
 
@@ -290,7 +290,7 @@ class Order extends \Magento\Payment\Helper\Data
         } catch (\Exception $e) {
             $this->helperData->log('Error cancelling order ' . $order->getIncrementId() . ': ' . $e->getMessage());
             
-            // Force cancellation as fallback
+
             $order->setState(SalesOrder::STATE_CANCELED);
             $order->setStatus('canceled');
             $order->addCommentToStatusHistory('Order force cancelled due to error: ' . $e->getMessage());

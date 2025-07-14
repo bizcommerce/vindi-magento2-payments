@@ -91,7 +91,7 @@ class ProcessCallbackQueue
             $connection = $this->resource->getConnection();
             $tableName = $this->resource->getTableName('vindi_vp_callback');
 
-            // Get only ONE pending callback ordered by creation date (FIFO)
+
             $select = $connection->select()
                 ->from($tableName)
                 ->where('queue_status = ?', 'pending')
@@ -127,7 +127,7 @@ class ProcessCallbackQueue
         $callbackId = $callback['entity_id'];
         $attempts = (int)$callback['attempts'];
 
-        // Update attempts counter
+
         $connection->update(
             $tableName,
             ['attempts' => $attempts + 1],
@@ -200,7 +200,7 @@ class ProcessCallbackQueue
                 $this->logger->warning(__('Transaction data missing in callback ID %1.', $callbackId));
             }
 
-            // Mark as executed
+
             $connection->update(
                 $tableName,
                 ['queue_status' => 'executed'],
@@ -212,7 +212,7 @@ class ProcessCallbackQueue
         } catch (\Exception $e) {
             $this->logger->error(__('Error processing callback ID %1: %2', $callbackId, $e->getMessage()));
 
-            // Mark as failed if max attempts reached
+
             if (($attempts + 1) >= 3) {
                 $connection->update(
                     $tableName,
