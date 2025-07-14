@@ -1,0 +1,26 @@
+<?php /** @var $block \Vindi\VP\Block\Info\CardCard */ ?>
+<div>
+    <strong>Método:</strong> Cartão + Cartão<br>
+    <?php
+    $paymentStatus = $block->getPaymentStatus();
+    if ($paymentStatus):
+    ?>
+        <strong>Status:</strong> <?= $block->escapeHtml($block->formatPaymentStatus($paymentStatus)) ?><br>
+    <?php endif; ?>
+    
+    <?php
+    $card1Info = $block->getCard1Info();
+    if ($card1Info['tid']):
+    ?>
+        <strong>Cartão 1 - ID da Transação:</strong> <?= $block->escapeHtml($card1Info['tid']) ?><br>
+    <?php endif; ?>
+    
+    <?php
+    $card2Info = $block->getCard2Info();
+    if ($card2Info['tid']):
+    ?>
+        <strong>Cartão 2 - ID da Transação:</strong> <?= $block->escapeHtml($card2Info['tid']) ?><br>
+    <?php else: ?>
+        <strong>Cartão 2:</strong> Processamento pendente<br>
+    <?php endif; ?>
+</div>

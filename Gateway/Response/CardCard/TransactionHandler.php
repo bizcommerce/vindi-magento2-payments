@@ -95,6 +95,12 @@ class TransactionHandler implements HandlerInterface
             "CardCard TransactionHandler - Response structure: " . json_encode(array_keys($response)),
             'cardcard_debug'
         );
+        
+        $this->helper->log(
+            "CardCard TransactionHandler - Full response: " . json_encode($response),
+            'cardcard_debug'
+        );
+        
         if (isset($response['transaction'])) {
             $this->helper->log(
                 "CardCard TransactionHandler - Transaction keys: " . json_encode(array_keys($response['transaction'])),
@@ -126,7 +132,17 @@ class TransactionHandler implements HandlerInterface
             $payment->setAdditionalInformation('card1_installments', $payment->getAdditionalInformation('installments'));
             $payment->setAdditionalInformation('card1_amount', $payment->getAdditionalInformation('amount_card1'));
 
-            $payment->setTransactionId($card1Tid);
+            // Only set transaction ID if TID is not empty to avoid Magento validation errors
+            if (!empty($card1Tid)) {
+                $payment->setTransactionId($card1Tid);
+                $payment->setLastTransId($card1Tid);
+                $payment->setAdditionalInformation('tid', $card1Tid);
+            } else {
+                $this->helper->log(
+                    "CardCard - Warning: Empty TID received for order {$order->getIncrementId()}, status: {$card1Status}",
+                    'cardcard_error'
+                );
+            }
             $payment->setIsTransactionClosed(false);
 
 

@@ -119,7 +119,8 @@ class CardCardTransaction implements ClientInterface
             $card1Response = $this->processCard1Payment($transactionData, $storeId);
             $this->api->logResponse($card1Response, self::LOG_NAME);
 
-            $this->logger->debug("CardCard API Response structure: " . json_encode([
+            $this->logger->debug([
+                'message' => 'CardCard API Response structure',
                 'has_data_response' => isset($card1Response['data_response']),
                 'has_transaction' => isset($card1Response['data_response']['transaction']),
                 'has_payment' => isset($card1Response['data_response']['transaction']['payment']),
@@ -127,41 +128,35 @@ class CardCardTransaction implements ClientInterface
                 'tid_value' => $card1Response['data_response']['transaction']['payment']['tid'] ?? 'NOT_SET',
                 'status_id' => $card1Response['data_response']['transaction']['status_id'] ?? 'NOT_SET',
                 'response_keys' => array_keys($card1Response)
-            ]), [], 'vindi-cardcard-debug');            if ($this->isSuccessfulCard1Response($card1Response)) {
+            ]);            if ($this->isSuccessfulCard1Response($card1Response)) {
                 $this->api->saveRequest($request, $card1Response, $card1Response['status'] ?? 'success', $this->methodCode);
 
-                $normalizedResponse = $card1Response;
-                if (isset($card1Response['data_response']['transaction'])) {
-                    $normalizedResponse = [
-                        'transaction' => $card1Response['data_response']['transaction']
-                    ];
-
-                    $normalizedResponse['data_response'] = $card1Response['data_response'];
-                    $normalizedResponse['message_response'] = $card1Response['message_response'] ?? '';
-                }
-
+                // Ensure consistent response structure for TransactionHandler
+                $transaction = $card1Response['data_response']['transaction'] ?? $card1Response;
+                
                 return [
                     'status' => 200,
                     'status_code' => 200,
-                    'transaction' => $card1Response['data_response']['transaction'] ?? $normalizedResponse
+                    'transaction' => [
+                        'data_response' => [
+                            'transaction' => $transaction
+                        ]
+                    ]
                 ];
             }
             $this->api->saveRequest($request, $card1Response, $card1Response['status'] ?? 'error', $this->methodCode);
 
-            $normalizedResponse = $card1Response;
-            if (isset($card1Response['data_response']['transaction'])) {
-                $normalizedResponse = [
-                    'transaction' => $card1Response['data_response']['transaction']
-                ];
-
-                $normalizedResponse['data_response'] = $card1Response['data_response'];
-                $normalizedResponse['message_response'] = $card1Response['message_response'] ?? '';
-            }
+            // Ensure consistent response structure for TransactionHandler even in error cases
+            $transaction = $card1Response['data_response']['transaction'] ?? $card1Response;
 
             return [
                 'status' => 400,
                 'status_code' => 400,
-                'transaction' => $card1Response['data_response']['transaction'] ?? $normalizedResponse
+                'transaction' => [
+                    'data_response' => [
+                        'transaction' => $transaction
+                    ]
+                ]
             ];
 
         } catch (\Exception $e) {
@@ -244,37 +239,77 @@ class CardCardTransaction implements ClientInterface
      */
     private function isSuccessfulCard1Response(array $response): bool
     {
+        $this->logger->debug([
+            'message' => 'CardCard isSuccessfulCard1Response - Checking response',
+            'has_error' => isset($response['error']),
+            'error_value' => $response['error'] ?? null,
+            'response_keys' => array_keys($response)
+        ]);
+
         if (isset($response['error'])) {
+            $this->logger->debug([
+                'message' => 'CardCard isSuccessfulCard1Response - Found error in response',
+                'error' => $response['error']
+            ]);
             return false;
         }
 
         if (isset($response['data_response']['transaction'])) {
             $transaction = $response['data_response']['transaction'];
             $statusId = $transaction['status_id'] ?? null;
+            $tid = $transaction['payment']['tid'] ?? null;
+
+            $this->logger->debug([
+                'message' => 'CardCard isSuccessfulCard1Response - Checking data_response.transaction',
+                'status_id' => $statusId,
+                'has_tid' => !empty($tid),
+                'tid_value' => $tid
+            ]);
 
             if (in_array($statusId, ['3', '4', 3, 4])) {
                 if ($statusId == '4' || $statusId == 4) {
+                    $this->logger->debug(['message' => 'CardCard isSuccessfulCard1Response - Status 4 SUCCESS']);
                     return true;
                 } elseif ($statusId == '3' || $statusId == 3) {
-                    $tid = $transaction['payment']['tid'] ?? null;
-                    return !empty($tid);
+                    $success = !empty($tid);
+                    $this->logger->debug([
+                        'message' => 'CardCard isSuccessfulCard1Response - Status 3',
+                        'has_valid_tid' => $success,
+                        'tid' => $tid
+                    ]);
+                    return $success;
                 }
             }
         }
 
         if (isset($response['status_id'])) {
             $statusId = $response['status_id'];
+            $tid = $response['payment']['tid'] ?? null;
+
+            $this->logger->debug([
+                'message' => 'CardCard isSuccessfulCard1Response - Checking direct status_id',
+                'status_id' => $statusId,
+                'has_tid' => !empty($tid),
+                'tid_value' => $tid
+            ]);
 
             if (in_array($statusId, ['3', '4', 3, 4])) {
                 if ($statusId == '4' || $statusId == 4) {
+                    $this->logger->debug(['message' => 'CardCard isSuccessfulCard1Response - Direct Status 4 SUCCESS']);
                     return true;
                 } elseif ($statusId == '3' || $statusId == 3) {
-                    $tid = $response['payment']['tid'] ?? null;
-                    return !empty($tid);
+                    $success = !empty($tid);
+                    $this->logger->debug([
+                        'message' => 'CardCard isSuccessfulCard1Response - Direct Status 3',
+                        'has_valid_tid' => $success,
+                        'tid' => $tid
+                    ]);
+                    return $success;
                 }
             }
         }
 
+        $this->logger->debug(['message' => 'CardCard isSuccessfulCard1Response - FAILURE - No valid status found']);
         return false;
     }
 

@@ -37,23 +37,31 @@ class CardCardValidator extends AbstractValidator
 
         $response = $validationSubject['response'];
 
+        // Add debug logging
+        error_log("CardCardValidator - Response structure: " . json_encode(array_keys($response)));
+        error_log("CardCardValidator - Full response: " . json_encode($response));
+
         if (isset($response['error']) && $response['error'] === true) {
             $errorMessage = $response['message'] ?? 'Unknown error in CardCard payment';
             return $this->createResult(false, [$errorMessage]);
         }
 
         if (isset($response['transaction'])) {
+            error_log("CardCardValidator - Transaction structure: " . json_encode(array_keys($response['transaction'])));
             $card1Valid = $this->validateCardResponse($response['transaction'], 'first');
             if (!$card1Valid['isValid']) {
+                error_log("CardCardValidator - Validation failed: " . implode(', ', $card1Valid['failsDescription']));
                 return $this->createResult(
                     false,
                     [__('First card payment validation error: %1', implode(', ', $card1Valid['failsDescription']))]
                 );
             }
         } else {
+            error_log("CardCardValidator - No transaction data found in response");
             return $this->createResult(false, [__('No transaction data found in response')]);
         }
 
+        error_log("CardCardValidator - Validation successful");
         return $this->createResult(true);
     }
 
@@ -68,21 +76,27 @@ class CardCardValidator extends AbstractValidator
     {
         $result = ['isValid' => true, 'failsDescription' => []];
 
-        if (!isset($response['status_id'])) {
+        // Handle nested structure: transaction.data_response.transaction
+        $transaction = $response;
+        if (isset($response['data_response']['transaction'])) {
+            $transaction = $response['data_response']['transaction'];
+        }
+
+        if (!isset($transaction['status_id'])) {
             $result['isValid'] = false;
             $result['failsDescription'][] = __('Missing status_id in %1 card response', $cardPosition);
         }
 
-        if (isset($response['status_id']) && !in_array($response['status_id'], ['3', '4'])) {
+        if (isset($transaction['status_id']) && !in_array($transaction['status_id'], ['3', '4'])) {
             $result['isValid'] = false;
             $result['failsDescription'][] = __(
                 'Invalid status in %1 card response: %2',
                 $cardPosition,
-                $response['status_id']
+                $transaction['status_id']
             );
         }
 
-        if (!isset($response['payment']['tid'])) {
+        if (!isset($transaction['payment']['tid'])) {
             $result['isValid'] = false;
             $result['failsDescription'][] = __('Missing transaction ID in %1 card response', $cardPosition);
         }

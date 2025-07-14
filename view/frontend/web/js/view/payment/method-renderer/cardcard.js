@@ -32,6 +32,7 @@ define(
         'vindi-cc-form',
         'Magento_Payment/js/model/credit-card-validation/validator',
         'Magento_Checkout/js/model/payment/additional-validators',
+        'Magento_Checkout/js/action/redirect-on-success',
         'mage/mage',
         'mage/validation',
         'vindi_vp/validation',
@@ -49,7 +50,10 @@ define(
         cardNumberValidator,
         creditCardData,
         fingerprint,
-        creditCardForm
+        creditCardForm,
+        validator,
+        additionalValidators,
+        redirectOnSuccessAction
     ) {
         'use strict';
 
@@ -1149,7 +1153,7 @@ define(
                                 function () {
                                     self.afterPlaceOrder();
                                     if (self.redirectAfterPlaceOrder) {
-                                        window.location.replace(window.checkoutConfig.payment[self.getCode()].redirectUrl);
+                                        redirectOnSuccessAction.execute();
                                     }
                                 }
                             ).always(
