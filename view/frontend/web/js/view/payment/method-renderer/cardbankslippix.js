@@ -167,7 +167,7 @@ define(
                 this.updateInstallmentsValues();
 
                 // Handle card amount change
-                $(document).on('change', '#bankslippix_card_amount', function() {
+                $(document).on('change', '#bankslippix_amount_credit', function() {
                     var grandTotal = self.getGrandTotal();
                     var cardAmount = parseFloat($(this).val() || 0);
 
@@ -201,7 +201,7 @@ define(
 
                         var remainingAmount = grandTotal - cardAmount;
                         remainingAmount = Math.round(remainingAmount * 100) / 100; // Arredonda para 2 casas decimais
-                        
+
                         // Validate if remaining amount for bankslip meets 5% rule
                         if (remainingAmount > 0) {
                             var remainingValidation = self.validatePercentage(remainingAmount, grandTotal);
@@ -214,12 +214,12 @@ define(
                             }
                         }
 
-                        $('#bankslippix_bankslip_amount').val(remainingAmount.toFixed(2)).prop('disabled', true);
+                        $('#bankslippix_amount_bankslip').val(remainingAmount.toFixed(2)).prop('disabled', true);
                         self.showBankslipError(false);
                         self.showPercentageErrorBankslip(false);
                         self.bankslipErrorMessage('');
                         self.percentageErrorBankslip('');
-                        $('#bankslippix_bankslip_amount').removeClass('error');
+                        $('#bankslippix_amount_bankslip').removeClass('error');
 
                         // Update installments when card amount changes
                         self.updateInstallmentsValues();
@@ -227,15 +227,15 @@ define(
                 });
 
                 // Handle when card amount is cleared
-                $(document).on('input', '#bankslippix_card_amount', function() {
+                $(document).on('input', '#bankslippix_amount_credit', function() {
                     if (!$(this).val() || $(this).val() === '') {
-                        $('#bankslippix_bankslip_amount').val('').prop('disabled', false);
+                        $('#bankslippix_amount_bankslip').val('').prop('disabled', false);
                         self.showCardError(false);
                         self.showPercentageErrorCard(false);
                         self.cardErrorMessage('');
                         self.percentageErrorCard('');
                         $(this).removeClass('error');
-                        $('#bankslippix_bankslip_amount').removeClass('error');
+                        $('#bankslippix_amount_bankslip').removeClass('error');
                         self.isFormValid(true);
                         // Update installments when card amount is cleared
                         self.updateInstallmentsValues();
@@ -243,7 +243,7 @@ define(
                 });
 
                 // Handle bankslip amount change
-                $(document).on('change', '#bankslippix_bankslip_amount', function() {
+                $(document).on('change', '#bankslippix_amount_bankslip', function() {
                     var grandTotal = self.getGrandTotal();
                     var bankslipAmount = parseFloat($(this).val() || 0);
 
@@ -277,7 +277,7 @@ define(
 
                         var remainingAmount = grandTotal - bankslipAmount;
                         remainingAmount = Math.round(remainingAmount * 100) / 100; // Arredonda para 2 casas decimais
-                        
+
                         // Validate if remaining amount for card meets 5% rule
                         if (remainingAmount > 0) {
                             var remainingValidation = self.validatePercentage(remainingAmount, grandTotal);
@@ -290,12 +290,12 @@ define(
                             }
                         }
 
-                        $('#bankslippix_card_amount').val(remainingAmount.toFixed(2)).prop('disabled', true);
+                        $('#bankslippix_amount_credit').val(remainingAmount.toFixed(2)).prop('disabled', true);
                         self.showCardError(false);
                         self.showPercentageErrorCard(false);
                         self.cardErrorMessage('');
                         self.percentageErrorCard('');
-                        $('#bankslippix_card_amount').removeClass('error');
+                        $('#bankslippix_amount_credit').removeClass('error');
 
                         // Update installments when bankslip amount changes (affecting card amount)
                         self.updateInstallmentsValues();
@@ -303,15 +303,15 @@ define(
                 });
 
                 // Handle when bankslip amount is cleared
-                $(document).on('input', '#bankslippix_bankslip_amount', function() {
+                $(document).on('input', '#bankslippix_amount_bankslip', function() {
                     if (!$(this).val() || $(this).val() === '') {
-                        $('#bankslippix_card_amount').val('').prop('disabled', false);
+                        $('#bankslippix_amount_credit').val('').prop('disabled', false);
                         self.showBankslipError(false);
                         self.showPercentageErrorBankslip(false);
                         self.bankslipErrorMessage('');
                         self.percentageErrorBankslip('');
                         $(this).removeClass('error');
-                        $('#bankslippix_card_amount').removeClass('error');
+                        $('#bankslippix_amount_credit').removeClass('error');
                         self.isFormValid(true);
                         // Update installments when bankslip amount is cleared
                         self.updateInstallmentsValues();
@@ -431,8 +431,8 @@ define(
                     ccExpYear = ccExpDateFull[1];
                 }
                 // Captura os valores dos inputs de split
-                var amountCard = parseFloat($('#bankslippix_card_amount').val() || 0);
-                var amountBankslip = parseFloat($('#bankslippix_bankslip_amount').val() || 0);
+                var amountCard = parseFloat($('#bankslippix_amount_credit').val() || 0);
+                var amountBankslip = parseFloat($('#bankslippix_amount_bankslip').val() || 0);
                 return {
                     'method': this.item.method,
                     'additional_data': {
@@ -447,7 +447,7 @@ define(
                         'installments': this.creditCardInstallments(),
                         'save_card': this.saveCard() ? 1 : 0,
                         'fingerprint': (window.yapay && window.yapay.FingerPrint) ? window.yapay.FingerPrint().getFingerPrint() : '',
-                        'amount_card': amountCard,
+                        'amount_credit': amountCard,
                         'amount_bankslip': amountBankslip
                     }
                 };
@@ -500,7 +500,7 @@ define(
                 var percentage = (amount / total) * 100;
                 var minAmount = (total * 0.05); // 5% minimum
                 var maxAmount = (total * 0.95); // 95% maximum
-                
+
                 if (amount > 0 && amount < minAmount) {
                     return {
                         valid: false,
@@ -509,16 +509,16 @@ define(
                         detailedMessage: $t('Valor muito baixo. O mínimo é 5% do total (R$ %1)').replace('%1', minAmount.toFixed(2).replace('.', ','))
                     };
                 }
-                
+
                 if (amount > maxAmount) {
                     return {
                         valid: false,
-                        type: 'maximum', 
+                        type: 'maximum',
                         message: $t('Para usar multi-métodos, cada método deve ter pelo menos 5% do valor total'),
                         detailedMessage: $t('Valor muito alto. O máximo é 95% do total (R$ %1)').replace('%1', maxAmount.toFixed(2).replace('.', ','))
                     };
                 }
-                
+
                 return {
                     valid: true
                 };
@@ -535,22 +535,22 @@ define(
                     var $form = $('#' + 'form_' + this.getCode());
 
                     // Validate card and bankslip amounts
-                    var cardAmount = parseFloat($('#bankslippix_card_amount').val() || 0);
-                    var bankslipAmount = parseFloat($('#bankslippix_bankslip_amount').val() || 0);
+                    var cardAmount = parseFloat($('#bankslippix_amount_credit').val() || 0);
+                    var bankslipAmount = parseFloat($('#bankslippix_amount_bankslip').val() || 0);
                     var grandTotal = this.getGrandTotal();
 
                     // Reset error states
                     this.showCardError(false);
                     this.showBankslipError(false);
-                    $('#bankslippix_card_amount').removeClass('error');
-                    $('#bankslippix_bankslip_amount').removeClass('error');
+                    $('#bankslippix_amount_credit').removeClass('error');
+                    $('#bankslippix_amount_bankslip').removeClass('error');
                     this.isFormValid(true);
 
                     // Validate card amount
                     if (cardAmount > grandTotal) {
                         this.showCardError(true);
                         this.cardErrorMessage($t('O valor excede o valor total do pedido.'));
-                        $('#bankslippix_card_amount').addClass('error');
+                        $('#bankslippix_amount_credit').addClass('error');
                         this.isFormValid(false);
                         return false;
                     }
@@ -559,7 +559,7 @@ define(
                     if (bankslipAmount > grandTotal) {
                         this.showBankslipError(true);
                         this.bankslipErrorMessage($t('O valor excede o valor total do pedido.'));
-                        $('#bankslippix_bankslip_amount').addClass('error');
+                        $('#bankslippix_amount_bankslip').addClass('error');
                         this.isFormValid(false);
                         return false;
                     }
@@ -571,7 +571,7 @@ define(
                     if (totalAmount > roundedGrandTotal + 0.01) { // Adding small tolerance (0.01)
                         this.showCardError(true);
                         this.cardErrorMessage($t('A soma dos valores excede o total do pedido.'));
-                        $('#bankslippix_card_amount').addClass('error');
+                        $('#bankslippix_amount_credit').addClass('error');
                         this.isFormValid(false);
                         return false;
                     }
@@ -580,7 +580,7 @@ define(
                     if (totalAmount === 0 || isNaN(totalAmount)) {
                         this.showCardError(true);
                         this.cardErrorMessage($t('Informe um valor para pelo menos um método de pagamento.'));
-                        $('#bankslippix_card_amount').addClass('error');
+                        $('#bankslippix_amount_credit').addClass('error');
                         this.isFormValid(false);
                         return false;
                     }
@@ -749,7 +749,7 @@ define(
                     }
 
                     // Get card amount value from form
-                    var cardAmount = parseFloat($('#bankslippix_card_amount').val() || 0);
+                    var cardAmount = parseFloat($('#bankslippix_amount_credit').val() || 0);
 
                     fetch(url, {
                         method: 'POST',
@@ -818,22 +818,22 @@ define(
                     var $form = $('#' + 'form_' + this.getCode());
 
                     // Validate card and bankslip amounts
-                    var cardAmount = parseFloat($('#bankslippix_card_amount').val() || 0);
-                    var bankslipAmount = parseFloat($('#bankslippix_bankslip_amount').val() || 0);
+                    var cardAmount = parseFloat($('#bankslippix_amount_credit').val() || 0);
+                    var bankslipAmount = parseFloat($('#bankslippix_amount_bankslip').val() || 0);
                     var grandTotal = this.getGrandTotal();
 
                     // Reset error states
                     this.showCardError(false);
                     this.showBankslipError(false);
-                    $('#bankslippix_card_amount').removeClass('error');
-                    $('#bankslippix_bankslip_amount').removeClass('error');
+                    $('#bankslippix_amount_credit').removeClass('error');
+                    $('#bankslippix_amount_bankslip').removeClass('error');
                     this.isFormValid(true);
 
                     // Validate card amount
                     if (cardAmount > grandTotal) {
                         this.showCardError(true);
                         this.cardErrorMessage($t('O valor excede o valor total do pedido.'));
-                        $('#bankslippix_card_amount').addClass('error');
+                        $('#bankslippix_amount_credit').addClass('error');
                         this.isFormValid(false);
                         return false;
                     }
@@ -842,7 +842,7 @@ define(
                     if (bankslipAmount > grandTotal) {
                         this.showBankslipError(true);
                         this.bankslipErrorMessage($t('O valor excede o valor total do pedido.'));
-                        $('#bankslippix_bankslip_amount').addClass('error');
+                        $('#bankslippix_amount_bankslip').addClass('error');
                         this.isFormValid(false);
                         return false;
                     }
@@ -854,7 +854,7 @@ define(
                     if (totalAmount > roundedGrandTotal + 0.01) { // Adding small tolerance (0.01)
                         this.showCardError(true);
                         this.cardErrorMessage($t('A soma dos valores excede o total do pedido.'));
-                        $('#bankslippix_card_amount').addClass('error');
+                        $('#bankslippix_amount_credit').addClass('error');
                         this.isFormValid(false);
                         return false;
                     }
@@ -863,7 +863,7 @@ define(
                     if (totalAmount === 0 || isNaN(totalAmount)) {
                         this.showCardError(true);
                         this.cardErrorMessage($t('Informe um valor para pelo menos um método de pagamento.'));
-                        $('#bankslippix_card_amount').addClass('error');
+                        $('#bankslippix_amount_credit').addClass('error');
                         this.isFormValid(false);
                         return false;
                     }

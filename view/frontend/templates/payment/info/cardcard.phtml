@@ -1,0 +1,127 @@
+<?php /** @var $block \Vindi\VP\Block\Info\CardCard */ ?>
+<?php
+$info = $block->getInfo();
+$card1Info = $block->getCard1Info();
+$card2Info = $block->getCard2Info();
+$paymentStatus = $block->getPaymentStatus();
+?>
+<div class="payment-method-title">
+    <strong><?= $block->escapeHtml(__('Payment Method')) ?>:</strong> <?= $block->escapeHtml(__('Card + Card')) ?>
+</div>
+
+<div class="vindi-payment-info">
+    <h4><?= __('First Card') ?></h4>
+    <ul>
+        <?php $ccType = $info->getData('cc_type'); ?>
+        <?php $ccOwner = $info->getData('cc_owner'); ?>
+        <?php $ccLast4 = $info->getData('cc_last_4'); ?>
+        <?php $installments = $info->getAdditionalInformation('cc_installments') ?? null; ?>
+        <?php $amountCredit = $info->getAdditionalInformation('amount_card1') ?? null; ?>
+        <?php if ($ccType): ?>
+            <li><strong><?= __('Card Brand:') ?></strong> <?= $block->escapeHtml($ccType) ?></li>
+        <?php endif; ?>
+        <?php if ($ccOwner): ?>
+            <li><strong><?= __('Card Owner:') ?></strong> <?= $block->escapeHtml($ccOwner) ?></li>
+        <?php endif; ?>
+        <?php if ($ccLast4): ?>
+            <li><strong><?= __('Card Number:') ?></strong> ****<?= $block->escapeHtml($ccLast4) ?></li>
+        <?php endif; ?>
+        <?php if ($installments): ?>
+            <li><strong><?= __('Installments:') ?></strong> <?= $block->escapeHtml($installments) ?>x</li>
+        <?php endif; ?>
+        <?php if ($amountCredit): ?>
+            <li><strong><?= __('Credit Card Amount:') ?></strong> R$ <?= number_format((float)$amountCredit, 2, ',', '.') ?></li>
+        <?php endif; ?>
+    </ul>
+
+    <h4><?= __('Second Card') ?></h4>
+    <ul>
+        <?php $ccType = $info->getAdditionalInformation('cc_type_2') ?? null; ?>
+        <?php $ccOwner = $info->getAdditionalInformation('cc_owner_2') ?? null; ?>
+        <?php $ccLast4 = $info->getAdditionalInformation('cc_last_4_2') ?? null; ?>
+        <?php $installments = $info->getAdditionalInformation('cc_installments_2') ?? null; ?>
+        <?php $amountCredit = $info->getAdditionalInformation('amount_card2') ?? null; ?>
+        <?php if ($ccType): ?>
+            <li><strong><?= __('Card Brand:') ?></strong> <?= $block->escapeHtml($ccType) ?></li>
+        <?php endif; ?>
+        <?php if ($ccOwner): ?>
+            <li><strong><?= __('Card Owner:') ?></strong> <?= $block->escapeHtml($ccOwner) ?></li>
+        <?php endif; ?>
+        <?php if ($ccLast4): ?>
+            <li><strong><?= __('Card Number:') ?></strong> ****<?= $block->escapeHtml($ccLast4) ?></li>
+        <?php endif; ?>
+        <?php if ($installments): ?>
+            <li><strong><?= __('Installments:') ?></strong> <?= $block->escapeHtml($installments) ?>x</li>
+        <?php endif; ?>
+        <?php if ($amountCredit): ?>
+            <li><strong><?= __('Credit Card Amount:') ?></strong> R$ <?= number_format((float)$amountCredit, 2, ',', '.') ?></li>
+        <?php endif; ?>
+    </ul>
+</div>
+
+<style>
+.vindi-payment-info {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 24px 20px 18px 20px;
+    margin: 20px 0 0 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    font-family: 'Segoe UI', 'Arial', sans-serif;
+    font-size: 1.4344rem;
+}
+.vindi-payment-info h4 {
+    color: #444;
+    font-size: 1.6469rem;
+    font-weight: 600;
+    margin: 0 0 14px 0;
+    letter-spacing: 0.5px;
+}
+.vindi-payment-info ul {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 22px 0;
+}
+.vindi-payment-info ul li {
+    margin-bottom: 15px;
+    color: #222;
+    font-size: 1.4344rem;
+    padding: 12px 0 12px 0;
+    border-bottom: 1px solid #ececec;
+}
+.vindi-payment-info ul li:last-child {
+    border-bottom: none;
+}
+.vindi-payment-info ul li strong {
+    color: #888;
+    font-weight: 500;
+    margin-right: 6px;
+    font-size: 1.4344rem;
+}
+.payment-method-title {
+    font-weight: 700;
+    font-size: 1.6469rem;
+    color: #333;
+    margin-bottom: 18px;
+    letter-spacing: 0.5px;
+}
+.vindi-payment-info a {
+    color: #3a3a3a;
+    text-decoration: underline;
+    word-break: break-all;
+    font-size: 1.4344rem;
+}
+.vindi-payment-info a:hover {
+    color: #007b8a;
+    text-decoration: none;
+}
+.payment-status {
+    margin-bottom: 15px;
+    padding: 5px 10px;
+    background-color: #f0f8ff;
+    border-left: 3px solid #007bdb;
+    font-size: 1.4344rem;
+    color: #222;
+}
+</style>
+
+<?= $block->getChildHtml() ?>

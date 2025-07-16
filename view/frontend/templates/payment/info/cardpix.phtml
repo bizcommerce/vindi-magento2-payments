@@ -1,0 +1,159 @@
+<?php
+
+/**
+ * Vindi
+ *
+ * NOTICE OF LICENSE
+ *
+ * This source file is subject to the Vindi license that is
+ * available through the world-wide-web at this URL:
+ *
+ *
+ * DISCLAIMER
+ *
+ * Do not edit or add to this file if you wish to upgrade this extension to newer
+ * version in the future.
+ *
+ * @category    Vindi
+ * @package     Vindi_Payment
+ * @copyright   Copyright (c) Vindi
+ *
+ */
+// @codingStandardsIgnoreFile
+
+/**
+ * @var \Vindi\VP\Block\Info\CardPix $block
+ * @see \Vindi\VP\Block\Info\CardPix
+ */
+$info = $block->getInfo();
+$title = $block->escapeHtml($block->getMethod()->getTitle());
+
+// Dados do cartão
+$ccType = $info->getData('cc_type');
+$ccOwner = $info->getData('cc_owner');
+$ccLast4 = $info->getData('cc_last_4');
+$installments = $info->getAdditionalInformation('installments');
+$amountCredit = $info->getAdditionalInformation('amount_credit');
+$amountPix = $info->getAdditionalInformation('amount_pix');
+
+// Dados do PIX
+$pixTid = $info->getAdditionalInformation('pix_payment_tid') ?? '';
+$pixStatus = $info->getAdditionalInformation('pix_status') ?? '';
+$pixQrCode = $info->getAdditionalInformation('pix_qr_code') ?? '';
+$pixUrl = $info->getAdditionalInformation('pix_url') ?? '';
+
+?>
+<div class="payment-method-title">
+    <strong><?= /* @noEscape */ __($title) ?></strong>
+</div>
+
+<div class="vindi-payment-info">
+    <h4><?= __('Credit Card') ?></h4>
+    <ul>
+        <?php if ($ccType): ?>
+            <li><strong><?= __('Card Brand:') ?></strong> <?= $block->escapeHtml($ccType) ?></li>
+        <?php endif; ?>
+        <?php if ($ccOwner): ?>
+            <li><strong><?= __('Card Owner:') ?></strong> <?= $block->escapeHtml($ccOwner) ?></li>
+        <?php endif; ?>
+        <?php if ($ccLast4): ?>
+            <li><strong><?= __('Card Number:') ?></strong> ****<?= $block->escapeHtml($ccLast4) ?></li>
+        <?php endif; ?>
+        <?php if ($installments): ?>
+            <li><strong><?= __('Installments:') ?></strong> <?= $block->escapeHtml($installments) ?>x</li>
+        <?php endif; ?>
+        <?php if ($amountCredit): ?>
+            <li><strong><?= __('Credit Card Amount:') ?></strong> R$ <?= number_format((float)$amountCredit, 2, ',', '.') ?></li>
+        <?php endif; ?>
+    </ul>
+
+    <h4><?= __('PIX') ?></h4>
+    <ul>
+        <?php if ($pixTid): ?>
+            <li><strong><?= __('PIX Transaction ID:') ?></strong> <?= $block->escapeHtml($pixTid) ?></li>
+        <?php endif; ?>
+        <?php if ($pixStatus): ?>
+            <li><strong><?= __('PIX Status:') ?></strong> <?= $block->escapeHtml($pixStatus) ?></li>
+        <?php endif; ?>
+        <?php if ($amountPix): ?>
+            <li><strong><?= __('Amount:') ?></strong> R$ <?= number_format((float)$amountPix, 2, ',', '.') ?></li>
+        <?php endif; ?>
+        <?php if ($pixQrCode || $pixUrl): ?>
+            <li style="text-align:center; padding-top: 10px; padding-bottom: 10px;">
+                <?php if ($pixUrl): ?>
+                    <img src="<?= $block->escapeUrl($pixUrl) ?>" alt="<?= $block->escapeHtml(__('PIX QR Code')) ?>" style="max-width:180px;display:block;margin:0 auto 10px auto;" />
+                <?php endif; ?>
+                <?php if ($pixQrCode): ?>
+                    <div class="pix-qrcode" style="overflow-wrap:break-word; margin-bottom:10px; font-family:monospace; font-size:13px; background:#fff; padding:8px; border-radius:4px; border:1px solid #ececec; display:inline-block; width:100%; max-width:320px; text-align:left;">
+                        <?= $block->escapeHtml($pixQrCode) ?>
+                    </div>
+                    <button class="pix-copy-button" data-text="<?= $block->escapeHtml(__('Copied!')) ?>" onclick="vindiVp.copyCode(this, '.pix-qrcode', false)" style="margin:0 auto;display:block;">
+                        <?= $block->escapeHtml(__('Copy code')) ?>
+                    </button>
+                <?php endif; ?>
+            </li>
+        <?php endif; ?>
+        <?php if ($pixUrl && !$pixQrCode): ?>
+            <li><strong><?= __('PIX Payment URL:') ?></strong> <a href="<?= $block->escapeUrl($pixUrl) ?>" target="_blank"><?= $block->escapeHtml($pixUrl) ?></a></li>
+        <?php endif; ?>
+    </ul>
+</div>
+
+<style>
+.vindi-payment-info {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 24px 20px 18px 20px;
+    margin: 20px 0 0 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    font-family: 'Segoe UI', 'Arial', sans-serif;
+    font-size: 1.4344rem;
+}
+.vindi-payment-info h4 {
+    color: #444;
+    font-size: 1.6469rem;
+    font-weight: 600;
+    margin: 0 0 14px 0;
+    letter-spacing: 0.5px;
+}
+.vindi-payment-info ul {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 22px 0;
+}
+.vindi-payment-info ul li {
+    margin-bottom: 15px;
+    color: #222;
+    font-size: 1.4344rem;
+    padding: 12px 0 12px 0;
+    border-bottom: 1px solid #ececec;
+}
+.vindi-payment-info ul li:last-child {
+    border-bottom: none;
+}
+.vindi-payment-info ul li strong {
+    color: #888;
+    font-weight: 500;
+    margin-right: 6px;
+    font-size: 1.4344rem;
+}
+.payment-method-title {
+    font-weight: 700;
+    font-size: 1.6469rem;
+    color: #333;
+    margin-bottom: 18px;
+    letter-spacing: 0.5px;
+}
+.vindi-payment-info a {
+    color: #3a3a3a;
+    text-decoration: underline;
+    word-break: break-all;
+    font-size: 1.4344rem;
+}
+.vindi-payment-info a:hover {
+    color: #007b8a;
+    text-decoration: none;
+}
+</style>
+
+<?= $block->getChildHtml() ?>

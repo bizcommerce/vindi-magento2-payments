@@ -24,6 +24,7 @@ use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Payment\Observer\AbstractDataAssignObserver;
 use Magento\Quote\Model\Quote\Payment;
 use Psr\Log\LoggerInterface;
+use Vindi\VP\Model\CreditCardRepository;
 
 class CreditCardAssignObserver extends AbstractDataAssignObserver
 {
@@ -42,18 +43,23 @@ class CreditCardAssignObserver extends AbstractDataAssignObserver
     /** @var LoggerInterface */
     protected $logger;
 
+    /** @var CreditCardRepository */
+    protected $creditCardRepository;
+
     public function __construct(
         Session $checkoutSession,
         Data $helper,
         Installments $installmentsHelper,
         Json $json,
-        LoggerInterface $logger
+        LoggerInterface $logger,
+        CreditCardRepository $creditCardRepository
     ) {
         $this->checkoutSession = $checkoutSession;
         $this->helper = $helper;
         $this->installmentsHelper = $installmentsHelper;
         $this->json = $json;
         $this->logger = $logger;
+        $this->creditCardRepository = $creditCardRepository;
     }
 
     /**
@@ -67,7 +73,7 @@ class CreditCardAssignObserver extends AbstractDataAssignObserver
     {
         try {
             $this->logger->info('[CreditCardAssignObserver] Iniciando execute observer');
-            
+
             $data = $this->readDataArgument($observer);
 
             /** @var array $additionalData */
@@ -82,16 +88,16 @@ class CreditCardAssignObserver extends AbstractDataAssignObserver
 
                 $this->logger->info('[CreditCardAssignObserver] Método de pagamento: ' . $method);
 
-                $metodosQuePrecisamDeCartao = [
+                $methodsThatRequireCard = [
                     'vindi_vp_cc',
                     'vindi_vp_cardpix',
                     'vindi_vp_cardbankslippix',
                     'vindi_vp_cardcard',
                 ];
 
-                if (isset($additionalData['cc_number']) && in_array($method, $metodosQuePrecisamDeCartao)) {
+                if (isset($additionalData['cc_number']) && in_array($method, $methodsThatRequireCard)) {
                     $this->logger->info('[CreditCardAssignObserver] Processando dados do primeiro cartão');
-                    
+
                     $installments = $additionalData['installments'] ?? 1;
                     $ccOwner = $additionalData['cc_owner'] ?? null;
                     $ccType = $additionalData['cc_type'] ?? null;
@@ -101,6 +107,25 @@ class CreditCardAssignObserver extends AbstractDataAssignObserver
                     $ccExpYear = $additionalData['cc_exp_year'] ?? null;
                     $paymentProfile = $additionalData["payment_profile"] ?? null;
                     $saveCard = $additionalData['save_card'] ?? 0;
+
+                    if ($paymentProfile) {
+                        try {
+                            $this->logger->info('[CreditCardAssignObserver] Buscando cartão salvo: ' . $paymentProfile);
+                            $card = $this->creditCardRepository->getById($paymentProfile);
+                            if ($card && $card->getId()) {
+                                $ccOwner = $card->getData('cc_name');
+                                $ccType = $card->getData('cc_type');
+                                $ccLast4 = $card->getData('cc_last_4');
+                                $ccExpDate = $card->getData('cc_exp_date');
+                                if ($ccExpDate && strpos($ccExpDate, '/') !== false) {
+                                    list($ccExpMonth, $ccExpYearShort) = explode('/', $ccExpDate);
+                                    $ccExpYear = '20' . $ccExpYearShort;
+                                }
+                            }
+                        } catch (\Exception $e) {
+                            $this->logger->error('[CreditCardAssignObserver] Erro ao buscar cartão salvo: ' . $e->getMessage());
+                        }
+                    }
 
                     $this->updateInterest((int) $installments);
 
@@ -122,30 +147,25 @@ class CreditCardAssignObserver extends AbstractDataAssignObserver
                     $paymentInfo->setAdditionalInformation('save_card', $saveCard);
                     $paymentInfo->setAdditionalInformation('cc_cid', $additionalData['cc_cid'] ?? null);
 
-                    if (in_array($method, ['vindi_vp_cardpix', 'vindi_vp_cardbankslippix', 'vindi_vp_cardcard'])) {
-                        if ($method === 'vindi_vp_cardcard') {
-                            $amountCard1 = $additionalData['amount_card1'] ?? 0;
-                            $amountCard2 = $additionalData['amount_card2'] ?? 0;
-                            
-                            $this->logger->info('[CreditCardAssignObserver] CardCard - amount_card1: ' . $amountCard1 . ', amount_card2: ' . $amountCard2);
-                            
-                            $paymentInfo->setAdditionalInformation('amount_card1', (float)$amountCard1);
-                            $paymentInfo->setAdditionalInformation('amount_card2', (float)$amountCard2);
-                        } else {
-                            $amountCredit = $additionalData['amount_credit'] ?? 0;
-                            $amountPix = $additionalData['amount_pix'] ?? 0;
-                            
-                            $paymentInfo->setAdditionalInformation('amount_credit', (float)$amountCredit);
-                            $paymentInfo->setAdditionalInformation('amount_pix', (float)$amountPix);
-                        }
-                    }
+                    $amountCredit1  = $additionalData['amount_credit1']  ?? 0;
+                    $amountCredit2  = $additionalData['amount_credit2']  ?? 0;
+                    $amountCredit   = $additionalData['amount_credit']   ?? 0;
+                    $amountBankslip = $additionalData['amount_bankslip'] ?? 0;
+                    $amountPix      = $additionalData['amount_pix']      ?? 0;
+
+
+                    $paymentInfo->setAdditionalInformation('amount_credit1', (float)$amountCredit1);
+                    $paymentInfo->setAdditionalInformation('amount_credit2', (float)$amountCredit2);
+                    $paymentInfo->setAdditionalInformation('amount_credit', (float)$amountCredit);
+                    $paymentInfo->setAdditionalInformation('amount_bankslip', (float)$amountBankslip);
+                    $paymentInfo->setAdditionalInformation('amount_pix', (float)$amountPix);
 
                     $paymentInfo->setAdditionalInformation('cc_cid_required', true);
                 }
 
                 if ($method === 'vindi_vp_cardcard' && isset($additionalData['cc_number_2'])) {
                     $this->logger->info('[CreditCardAssignObserver] Processando dados do segundo cartão');
-                    
+
                     $installments2 = $additionalData['installments_2'] ?? 1;
                     $ccOwner2 = $additionalData['cc_owner_2'] ?? null;
                     $ccType2 = $additionalData['cc_type_2'] ?? null;
@@ -155,6 +175,26 @@ class CreditCardAssignObserver extends AbstractDataAssignObserver
                     $ccExpYear2 = $additionalData['cc_exp_year_2'] ?? null;
                     $paymentProfile2 = $additionalData['second_payment_profile'] ?? null;
                     $saveCard2 = $additionalData['save_card_2'] ?? 0;
+
+                    if ($paymentProfile2) {
+                        try {
+                            $this->logger->info('[CreditCardAssignObserver] Buscando segundo cartão salvo: ' . $paymentProfile2);
+                            $card2 = $this->creditCardRepository->getById($paymentProfile2);
+                            if ($card2 && $card2->getId()) {
+                                $ccOwner2 = $card2->getData('cc_name');
+                                $ccType2 = $card2->getData('cc_type');
+                                $ccLast4_2 = $card2->getData('cc_last_4');
+                                $ccExpDate2 = $card2->getData('cc_exp_date');
+
+                                if ($ccExpDate2 && strpos($ccExpDate2, '/') !== false) {
+                                    list($ccExpMonth2, $ccExpYearShort2) = explode('/', $ccExpDate2);
+                                    $ccExpYear2 = '20' . $ccExpYearShort2;
+                                }
+                            }
+                        } catch (\Exception $e) {
+                            $this->logger->error('[CreditCardAssignObserver] Erro ao buscar segundo cartão salvo: ' . $e->getMessage());
+                        }
+                    }
 
                     $paymentInfo->setAdditionalInformation('installments_2', $installments2);
                     $paymentInfo->setAdditionalInformation('cc_installments_2', $installments2);
@@ -171,13 +211,13 @@ class CreditCardAssignObserver extends AbstractDataAssignObserver
                     $paymentInfo->setAdditionalInformation('cc_exp_year_2', $ccExpYear2);
 
                     $paymentInfo->setAdditionalInformation('cc_cid_2_required', true);
-                    
+
                     $this->logger->info('[CreditCardAssignObserver] Segundo cartão processado com sucesso');
                 }
             }
-            
+
             $this->logger->info('[CreditCardAssignObserver] Execute observer finalizado com sucesso');
-            
+
         } catch (\Exception $e) {
             $this->logger->error('[CreditCardAssignObserver] Erro no execute: ' . $e->getMessage());
             $this->logger->error('[CreditCardAssignObserver] Stack trace: ' . $e->getTraceAsString());

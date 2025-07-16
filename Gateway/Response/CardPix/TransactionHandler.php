@@ -92,6 +92,9 @@ class TransactionHandler implements HandlerInterface
             $cardTid = $cardTransaction['payment']['tid'] ?? '';
             $cardStatus = $cardTransaction['status_id'] ?? '';
 
+            // Adicionar persistência de dados de cartão
+            $this->saveCardInformation($payment, $cardTransaction);
+
             $payment->setAdditionalInformation('card_payment_tid', $cardTid);
             $payment->setAdditionalInformation('card_status', $cardStatus);
             $payment->setAdditionalInformation('card_installments', $payment->getAdditionalInformation('installments'));
@@ -189,5 +192,58 @@ class TransactionHandler implements HandlerInterface
         $tid = $response['payment']['tid'] ?? null;
         
         return !empty($tid) && in_array($statusId, ['3', '4']);
+    }
+
+    /**
+     * Save card information to payment object native fields
+     *
+     * @param \Magento\Payment\Model\InfoInterface $payment
+     * @param array $transactionData
+     * @return void
+     */
+    private function saveCardInformation($payment, array $transactionData): void
+    {
+        try {
+            // Verificar se há dados de cartão no payment da transação
+            if (isset($transactionData['payment'])) {
+                $paymentData = $transactionData['payment'];
+                
+                // Mapear dados do cartão para campos nativos
+                if (isset($paymentData['brand'])) {
+                    $payment->setCcType($paymentData['brand']);
+                    $payment->setAdditionalInformation('cc_type', $paymentData['brand']);
+                }
+                
+                if (isset($paymentData['last_digits'])) {
+                    $payment->setCcLast4($paymentData['last_digits']);
+                    $payment->setAdditionalInformation('cc_last_4', $paymentData['last_digits']);
+                }
+                
+                // Para holder_name, pode estar em diferentes lugares
+                $holderName = $paymentData['holder_name'] ?? 
+                             $paymentData['card_holder_name'] ?? 
+                             $transactionData['customer']['name'] ?? null;
+                
+                if ($holderName) {
+                    $payment->setCcOwner($holderName);
+                    $payment->setAdditionalInformation('cc_owner', $holderName);
+                }
+                
+                // Salvar dados de parcelamento se disponível
+                if (isset($paymentData['installments'])) {
+                    $payment->setAdditionalInformation('vindi_installments', $paymentData['installments']);
+                }
+                
+                $this->helper->log(
+                    "CardPix - Card information saved: Type={$paymentData['brand']}, Last4={$paymentData['last_digits']}, Owner={$holderName}",
+                    'cardpix_handler'
+                );
+            }
+        } catch (\Exception $e) {
+            $this->helper->log(
+                "CardPix - Error saving card information: " . $e->getMessage(),
+                'cardpix_error'
+            );
+        }
     }
 }

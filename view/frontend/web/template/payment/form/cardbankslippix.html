@@ -50,14 +50,14 @@
                     <!--=== Pagamento com Cartão de Crédito ===-->
                     <div class="field number required">
                         <h3 data-bind="i18n: 'Pagamento com Cartão de Crédito'"></h3>
-                        <label class="label" for="bankslippix_card_amount">
+                        <label class="label" for="bankslippix_amount_credit">
                             <span>Valor a pagar com Cartão de Crédito:</span>
                         </label>
                         <div class="control">
                             <input
                                 type="text"
-                                name="payment[card_amount]"
-                                id="bankslippix_card_amount"
+                                name="payment[amount_credit]"
+                                id="bankslippix_amount_credit"
                                 placeholder="0,00"
                                 class="input-text-vindi"
                                 data-bind="enable: isActive($parents)"
@@ -263,14 +263,14 @@
                     <!--=== Pagamento com Boleto ===-->
                     <div class="field number required">
                         <h3 data-bind="i18n: 'Pagamento com Boleto'"></h3>
-                        <label class="label" for="bankslippix_bankslip_amount">
+                        <label class="label" for="bankslippix_amount_bankslip">
                             <span>Valor a pagar com Boleto:</span>
                         </label>
                         <div class="control">
                             <input
                                 type="text"
-                                name="payment[bankslip_amount]"
-                                id="bankslippix_bankslip_amount"
+                                name="payment[amount_bankslip]"
+                                id="bankslippix_amount_bankslip"
                                 placeholder="0,00"
                                 class="input-text-vindi"
                                 data-bind="enable: isActive($parents)" />

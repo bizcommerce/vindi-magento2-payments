@@ -73,6 +73,24 @@ class CreditCardRepository implements CreditCardRepositoryInterface
     }
 
     /**
+     * Get Credit Card by Card Token
+     *
+     * @param string $cardToken
+     * @return CreditCardInterface|null
+     */
+    public function getByCardToken(string $cardToken)
+    {
+        $collection = $this->collectionFactory->create();
+        $collection->addFieldToFilter('card_token', $cardToken);
+        $collection->setPageSize(1);
+        $item = $collection->getFirstItem();
+        if ($item && $item->getId()) {
+            return $item;
+        }
+        return null;
+    }
+
+    /**
      * Delete Credit Card
      *
      * @param CreditCardInterface $creditCard

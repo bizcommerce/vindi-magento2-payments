@@ -13,6 +13,11 @@ declare(strict_types=1);
 
 namespace Vindi\VP\Block\Info;
 
+use Magento\Framework\DataObject;
+use Magento\Framework\View\Element\Template\Context;
+use Magento\Payment\Gateway\ConfigInterface;
+use Magento\Payment\Model\Config;
+
 /**
  * Class CardCard
  * Block for displaying Card + Card payment information
@@ -22,7 +27,7 @@ class CardCard extends AbstractInfo
     /**
      * @var string
      */
-    protected $_template = 'Vindi_VP::info/cardcard.phtml';
+    protected $_template = 'Vindi_VP::payment/info/cardcard.phtml';
 
     /**
      * Returns label
@@ -46,6 +51,53 @@ class CardCard extends AbstractInfo
         ];
 
         return $labels[$field] ?? parent::getLabel($field);
+    }
+
+    /**
+     * Prepare specific information for display
+     *
+     * @param null $transport
+     * @return \Magento\Framework\DataObject
+     */
+    protected function _prepareSpecificInformation($transport = null)
+    {
+        $info = $this->getInfo();
+        $data = [];
+        
+        // Dados de cartão
+        if ($info->getCcType()) {
+            $data[(string)__('Credit Card Type')] = $this->getCcTypeName();
+        }
+        if ($info->getCcOwner()) {
+            $data[(string)__('Credit Card Owner')] = $info->getCcOwner();
+        }
+        if ($info->getCcLast4()) {
+            $data[(string)__('Credit Card Number')] = sprintf('xxxx-%s', $info->getCcLast4());
+        }
+        
+        // Dados específicos do método CardCard
+        if ($installments = $info->getAdditionalInformation('vindi_installments')) {
+            $data[(string)__('Installments')] = $installments;
+        }
+        
+        $paymentStatus = $this->getPaymentStatus();
+        if ($paymentStatus) {
+            $data[(string)__('Payment Status')] = $this->formatPaymentStatus($paymentStatus);
+        }
+        
+        // Informações das duas transações de cartão
+        $card1Info = $this->getCard1Info();
+        if ($card1Info['tid']) {
+            $data[(string)__('Card 1 Transaction ID')] = $card1Info['tid'];
+        }
+        
+        $card2Info = $this->getCard2Info();
+        if ($card2Info['tid']) {
+            $data[(string)__('Card 2 Transaction ID')] = $card2Info['tid'];
+        }
+        
+        $transport = new \Magento\Framework\DataObject($data);
+        return parent::_prepareSpecificInformation($transport);
     }
 
     /**
@@ -116,5 +168,21 @@ class CardCard extends AbstractInfo
         ];
 
         return $statusLabels[$status] ?? __($status);
+    }
+
+    /**
+     * Retrieve credit card type name
+     *
+     * @return string
+     * @throws \Magento\Framework\Exception\LocalizedException
+     */
+    public function getCcTypeName()
+    {
+        $types = $this->paymentConfig->getCcTypes();
+        $ccType = $this->getInfo()->getCcType();
+        if (isset($types[$ccType])) {
+            return $types[$ccType];
+        }
+        return empty($ccType) ? __('N/A') : __(ucwords($ccType));
     }
 }

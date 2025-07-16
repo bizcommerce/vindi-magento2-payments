@@ -67,6 +67,53 @@ class CardBankSlipPix extends AbstractInfo
     }
 
     /**
+     * Prepare specific information for display
+     *
+     * @param null $transport
+     * @return \Magento\Framework\DataObject
+     */
+    protected function _prepareSpecificInformation($transport = null)
+    {
+        $info = $this->getInfo();
+        $data = [];
+        
+        // Dados de cartão
+        if ($info->getCcType()) {
+            $data[(string)__('Credit Card Type')] = $this->getCcTypeName();
+        }
+        if ($info->getCcOwner()) {
+            $data[(string)__('Credit Card Owner')] = $info->getCcOwner();
+        }
+        if ($info->getCcLast4()) {
+            $data[(string)__('Credit Card Number')] = sprintf('xxxx-%s', $info->getCcLast4());
+        }
+        
+        // Dados específicos do método
+        if ($installments = $info->getAdditionalInformation('vindi_installments')) {
+            $data[(string)__('Installments')] = $installments;
+        }
+        
+        // Informações de pagamento
+        $cardAmount = $this->getCardAmount();
+        if ($cardAmount && $cardAmount !== '$0.00') {
+            $data[(string)__('Card Amount')] = $cardAmount;
+        }
+        
+        $cardTid = $this->getCardTid();
+        if ($cardTid) {
+            $data[(string)__('Card Transaction ID')] = $cardTid;
+        }
+        
+        $bankSlipNumber = $this->getBankSlipNumber();
+        if ($bankSlipNumber) {
+            $data[(string)__('Bank Slip Number')] = $bankSlipNumber;
+        }
+        
+        $transport = new \Magento\Framework\DataObject($data);
+        return parent::_prepareSpecificInformation($transport);
+    }
+
+    /**
      * @inheritDoc
      */
     public function _construct()
@@ -230,5 +277,21 @@ class CardBankSlipPix extends AbstractInfo
     {
         $payment = $this->getInfo();
         return (string) $payment->getAdditionalInformation('qr_code_url');
+    }
+
+    /**
+     * Retrieve credit card type name
+     *
+     * @return string
+     * @throws \Magento\Framework\Exception\LocalizedException
+     */
+    public function getCcTypeName()
+    {
+        $types = $this->paymentConfig->getCcTypes();
+        $ccType = $this->getInfo()->getCcType();
+        if (isset($types[$ccType])) {
+            return $types[$ccType];
+        }
+        return empty($ccType) ? __('N/A') : __(ucwords($ccType));
     }
 }

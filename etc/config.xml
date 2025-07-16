@@ -198,8 +198,8 @@
                 <can_refund_partial_per_invoice>0</can_refund_partial_per_invoice>
                 <can_cancel>1</can_cancel>
                 <can_edit>0</can_edit>
-                <paymentInfoKeys>transaction_id,token_transaction,track_transaction_id,status_name,tid,payment_method_id,payment_method_name,split</paymentInfoKeys>
-                <privateInfoKeys>transaction_id,token_transaction,track_transaction_id,tid,payment_method_id,payment_method_name,split</privateInfoKeys>
+                <paymentInfoKeys>cc_type,cc_owner,cc_last_4,installments,card_payment_tid,card_installments,card_amount,amount_credit,amount_pix,transaction_id,tid,payment_method_id,payment_method_name</paymentInfoKeys>
+                <privateInfoKeys>transaction_id,tid,payment_method_id,payment_method_name</privateInfoKeys>
                 <debug>1</debug>
                 <payment_link_instructions>To pay, complete the card payment first, then scan the PIX QR code.</payment_link_instructions>
             </vindi_vp_cardpix>
@@ -222,8 +222,8 @@
                 <can_refund_partial_per_invoice>0</can_refund_partial_per_invoice>
                 <can_cancel>1</can_cancel>
                 <can_edit>0</can_edit>
-                <paymentInfoKeys>transaction_id,token_transaction,track_transaction_id,status_name,tid,payment_method_id,payment_method_name,split</paymentInfoKeys>
-                <privateInfoKeys>transaction_id,token_transaction,track_transaction_id,tid,payment_method_id,payment_method_name,split</privateInfoKeys>
+                <paymentInfoKeys>cc_type,cc_owner,cc_last_4,vindi_installments,transaction_id,token_transaction,track_transaction_id,status_name,tid,payment_method_id,payment_method_name,split</paymentInfoKeys>
+                <privateInfoKeys>cc_type,cc_owner,cc_last_4,transaction_id,token_transaction,track_transaction_id,tid,payment_method_id,payment_method_name,split</privateInfoKeys>
                 <debug>1</debug>
                 <payment_link_instructions>Please complete the first card payment and then complete the second card payment.</payment_link_instructions>
             </vindi_vp_cardcard>
@@ -246,8 +246,8 @@
                 <can_refund_partial_per_invoice>0</can_refund_partial_per_invoice>
                 <can_cancel>1</can_cancel>
                 <can_edit>0</can_edit>
-                <paymentInfoKeys>transaction_id,token_transaction,track_transaction_id,status_name,tid,payment_method_id,payment_method_name,split,bank_slip_number</paymentInfoKeys>
-                <privateInfoKeys>transaction_id,token_transaction,track_transaction_id,tid,payment_method_id,payment_method_name,split,bank_slip_number</privateInfoKeys>
+                <paymentInfoKeys>cc_type,cc_owner,cc_last_4,vindi_installments,transaction_id,token_transaction,track_transaction_id,status_name,tid,payment_method_id,payment_method_name,split,bank_slip_number</paymentInfoKeys>
+                <privateInfoKeys>cc_type,cc_owner,cc_last_4,transaction_id,token_transaction,track_transaction_id,tid,payment_method_id,payment_method_name,split,bank_slip_number</privateInfoKeys>
                 <debug>1</debug>
                 <payment_link_instructions>To pay, complete the card payment first, then follow bank slip instructions.</payment_link_instructions>
             </vindi_vp_cardbankslippix>
