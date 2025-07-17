@@ -64,7 +64,6 @@ class CardCard extends AbstractInfo
         $info = $this->getInfo();
         $data = [];
         
-        // Dados de cartão
         if ($info->getCcType()) {
             $data[(string)__('Credit Card Type')] = $this->getCcTypeName();
         }
@@ -75,7 +74,6 @@ class CardCard extends AbstractInfo
             $data[(string)__('Credit Card Number')] = sprintf('xxxx-%s', $info->getCcLast4());
         }
         
-        // Dados específicos do método CardCard
         if ($installments = $info->getAdditionalInformation('vindi_installments')) {
             $data[(string)__('Installments')] = $installments;
         }
@@ -85,7 +83,6 @@ class CardCard extends AbstractInfo
             $data[(string)__('Payment Status')] = $this->formatPaymentStatus($paymentStatus);
         }
         
-        // Informações das duas transações de cartão
         $card1Info = $this->getCard1Info();
         if ($card1Info['tid']) {
             $data[(string)__('Card 1 Transaction ID')] = $card1Info['tid'];

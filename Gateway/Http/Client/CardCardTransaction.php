@@ -131,7 +131,6 @@ class CardCardTransaction implements ClientInterface
             ]);            if ($this->isSuccessfulCard1Response($card1Response)) {
                 $this->api->saveRequest($request, $card1Response, $card1Response['status'] ?? 'success', $this->methodCode);
 
-                // Ensure consistent response structure for TransactionHandler
                 $transaction = $card1Response['data_response']['transaction'] ?? $card1Response;
                 
                 return [
@@ -146,7 +145,6 @@ class CardCardTransaction implements ClientInterface
             }
             $this->api->saveRequest($request, $card1Response, $card1Response['status'] ?? 'error', $this->methodCode);
 
-            // Ensure consistent response structure for TransactionHandler even in error cases
             $transaction = $card1Response['data_response']['transaction'] ?? $card1Response;
 
             return [

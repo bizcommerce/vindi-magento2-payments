@@ -48,7 +48,6 @@ class CardPix extends AbstractInfo
     {
         $info = $this->getInfo();
         
-        // First, try to get PIX data from multi_payment_info (processed via CRON)
         $multiPaymentInfo = $info->getAdditionalInformation('multi_payment_info') ?: [];
         $pixData = null;
         
@@ -61,7 +60,6 @@ class CardPix extends AbstractInfo
             }
         }
         
-        // If found in multi_payment_info, use that data
         if ($pixData) {
             return [
                 'tid' => $pixData['transaction_id'] ?? '',
@@ -73,7 +71,6 @@ class CardPix extends AbstractInfo
             ];
         }
         
-        // Fallback to direct additional information (for backwards compatibility)
         return [
             'tid' => $info->getAdditionalInformation('pix_payment_tid') ?? '',
             'status' => $info->getAdditionalInformation('pix_status') ?? '',
@@ -225,7 +222,6 @@ class CardPix extends AbstractInfo
         $info = $this->getInfo();
         $data = [];
         
-        // Dados de cartão
         if ($info->getCcType()) {
             $data[(string)__('Credit Card Type')] = $this->getCcTypeName();
         }
@@ -236,12 +232,10 @@ class CardPix extends AbstractInfo
             $data[(string)__('Credit Card Number')] = sprintf('xxxx-%s', $info->getCcLast4());
         }
         
-        // Dados específicos do método
         if ($installments = $info->getAdditionalInformation('vindi_installments')) {
             $data[(string)__('Installments')] = $installments;
         }
         
-        // Informações de pagamento CardPix
         $cardInfo = $this->getCardInfo();
         if ($cardInfo['tid']) {
             $data[(string)__('Card Transaction ID')] = $cardInfo['tid'];

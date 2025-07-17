@@ -37,7 +37,6 @@ class CardCardValidator extends AbstractValidator
 
         $response = $validationSubject['response'];
 
-        // Add debug logging
         error_log("CardCardValidator - Response structure: " . json_encode(array_keys($response)));
         error_log("CardCardValidator - Full response: " . json_encode($response));
 
@@ -76,7 +75,6 @@ class CardCardValidator extends AbstractValidator
     {
         $result = ['isValid' => true, 'failsDescription' => []];
 
-        // Handle nested structure: transaction.data_response.transaction
         $transaction = $response;
         if (isset($response['data_response']['transaction'])) {
             $transaction = $response['data_response']['transaction'];

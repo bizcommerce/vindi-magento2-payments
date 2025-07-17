@@ -100,7 +100,6 @@ class TransactionHandler implements HandlerInterface
                 );
             }
 
-            // Adicionar persistência de dados de cartão
             $this->saveCardInformation($payment, $cardTransaction);
 
             $payment->setAdditionalInformation('card_payment_tid', $cardTid);
@@ -224,11 +223,9 @@ class TransactionHandler implements HandlerInterface
     private function saveCardInformation($payment, array $transactionData): void
     {
         try {
-            // Verificar se há dados de cartão no payment da transação
             if (isset($transactionData['payment'])) {
                 $paymentData = $transactionData['payment'];
                 
-                // Mapear dados do cartão para campos nativos
                 if (isset($paymentData['brand'])) {
                     $payment->setCcType($paymentData['brand']);
                     $payment->setAdditionalInformation('cc_type', $paymentData['brand']);
@@ -239,7 +236,6 @@ class TransactionHandler implements HandlerInterface
                     $payment->setAdditionalInformation('cc_last_4', $paymentData['last_digits']);
                 }
                 
-                // Para holder_name, pode estar em diferentes lugares
                 $holderName = $paymentData['holder_name'] ?? 
                              $paymentData['card_holder_name'] ?? 
                              $transactionData['customer']['name'] ?? null;
@@ -249,7 +245,6 @@ class TransactionHandler implements HandlerInterface
                     $payment->setAdditionalInformation('cc_owner', $holderName);
                 }
                 
-                // Salvar dados de parcelamento se disponível
                 if (isset($paymentData['installments'])) {
                     $payment->setAdditionalInformation('vindi_installments', $paymentData['installments']);
                 }

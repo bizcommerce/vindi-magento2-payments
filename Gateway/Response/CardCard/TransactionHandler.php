@@ -127,7 +127,6 @@ class TransactionHandler implements HandlerInterface
             $card1Tid = $card1Transaction['payment']['tid'] ?? '';
             $card1Status = $card1Transaction['status_id'] ?? '';
 
-            // Adicionar persistência de dados de cartão
             $this->saveCardInformation($payment, $card1Transaction);
 
             $payment->setAdditionalInformation('card1_payment_tid', $card1Tid);
@@ -135,7 +134,6 @@ class TransactionHandler implements HandlerInterface
             $payment->setAdditionalInformation('card1_installments', $payment->getAdditionalInformation('installments'));
             $payment->setAdditionalInformation('card1_amount', $payment->getAdditionalInformation('amount_card1'));
 
-            // Only set transaction ID if TID is not empty to avoid Magento validation errors
             if (!empty($card1Tid)) {
                 $payment->setTransactionId($card1Tid);
                 $payment->setLastTransId($card1Tid);
@@ -297,11 +295,9 @@ class TransactionHandler implements HandlerInterface
     private function saveCardInformation($payment, array $transactionData): void
     {
         try {
-            // Verificar se há dados de cartão no payment da transação
             if (isset($transactionData['payment'])) {
                 $paymentData = $transactionData['payment'];
                 
-                // Mapear dados do cartão para campos nativos
                 if (isset($paymentData['brand'])) {
                     $payment->setCcType($paymentData['brand']);
                     $payment->setAdditionalInformation('cc_type', $paymentData['brand']);
@@ -312,7 +308,6 @@ class TransactionHandler implements HandlerInterface
                     $payment->setAdditionalInformation('cc_last_4', $paymentData['last_digits']);
                 }
                 
-                // Para holder_name, pode estar em diferentes lugares
                 $holderName = $paymentData['holder_name'] ?? 
                              $paymentData['card_holder_name'] ?? 
                              $transactionData['customer']['name'] ?? null;
@@ -322,7 +317,6 @@ class TransactionHandler implements HandlerInterface
                     $payment->setAdditionalInformation('cc_owner', $holderName);
                 }
                 
-                // Salvar dados de parcelamento se disponível
                 if (isset($paymentData['installments'])) {
                     $payment->setAdditionalInformation('vindi_installments', $paymentData['installments']);
                 }

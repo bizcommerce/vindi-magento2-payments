@@ -77,7 +77,6 @@ class CardBankSlipPix extends AbstractInfo
         $info = $this->getInfo();
         $data = [];
         
-        // Dados de cartão
         if ($info->getCcType()) {
             $data[(string)__('Credit Card Type')] = $this->getCcTypeName();
         }
@@ -88,12 +87,10 @@ class CardBankSlipPix extends AbstractInfo
             $data[(string)__('Credit Card Number')] = sprintf('xxxx-%s', $info->getCcLast4());
         }
         
-        // Dados específicos do método
         if ($installments = $info->getAdditionalInformation('vindi_installments')) {
             $data[(string)__('Installments')] = $installments;
         }
         
-        // Informações de pagamento
         $cardAmount = $this->getCardAmount();
         if ($cardAmount && $cardAmount !== '$0.00') {
             $data[(string)__('Card Amount')] = $cardAmount;
